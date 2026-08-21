@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Nextflow / nf-core work
+work/
+.nextflow/
+.nextflow.log*
+*.nf.log
+
+# Results / large data (yalnız istenerek eklenir)
+results/
+data/
+*.fastq
+*.fastq.gz
+*.fq.gz
+*.bam
+*.fasta.gz
+
+# OS
+.DS_Store

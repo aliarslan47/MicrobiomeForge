@@ -1,0 +1,30 @@
+name: microbiomeforge
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Python katmanı
+  - python>=3.11
+  - pandas>=2.0
+  - numpy>=1.24
+  - scipy>=1.11
+  - statsmodels>=0.14
+  - scikit-bio>=0.6
+  - scikit-posthocs>=0.9
+  - matplotlib>=3.8
+  - seaborn>=0.13
+  - jinja2>=3.1
+  - biopython>=1.83
+  - pyyaml>=6.0
+  - pytest>=8.0
+  # Rapor PDF
+  - pandoc
+  # nf-core çalışma motoru
+  - nextflow>=23.10
+  - nf-core
+  # Ham QC (istatistik zincirinin başı)
+  - seqkit
+  - fastp
+  - nanoplot
+  # Not: taxprofiler/mag araçları (Kraken2, sylph, SemiBin2, metaMDBG, CheckM2 ...)
+  #      nf-core tarafından konteyner (podman) ile çekilir; burada gerekmez.
