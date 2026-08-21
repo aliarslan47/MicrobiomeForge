@@ -1,0 +1,5 @@
+sample,fastq_1,fastq_2,long_reads,group,sample_type,platform
+gut_pre_illumina,data/pre_Day1_illumina_R1.fastq.gz,data/pre_Day1_illumina_R2.fastq.gz,,pre,microbiome,auto
+gut_post_illumina,data/post_Day30_illumina_R1.fastq.gz,data/post_Day30_illumina_R2.fastq.gz,,post,microbiome,auto
+gut_pre_nanopore,,,data/pre_Day1_nanopore.fastq.gz,pre,microbiome,auto
+gut_post_nanopore,,,data/post_Day30_nanopore.fastq.gz,post,microbiome,auto
