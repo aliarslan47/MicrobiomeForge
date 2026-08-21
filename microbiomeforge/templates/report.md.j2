@@ -1,0 +1,92 @@
+# MicrobiomeForge Raporu
+
+**Proje:** {{ project }}
+**Tarih:** {{ date }}
+**Örnek sayısı:** {{ n_samples }} · **Gruplar:** {{ groups | join(", ") }}
+**Platformlar:** {{ platforms | join(", ") }}
+
+---
+
+## 1. Özet
+
+{{ summary }}
+
+---
+
+## 2. Ham veri kalitesi ve istatistiği
+
+Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
+
+{{ table_raw_qc }}
+
+{% if fig_raw_qc %}![{{ fig_raw_qc.title }}]({{ fig_raw_qc.png_path }})
+
+*Şekil {{ fig_raw_qc.number }}. {{ fig_raw_qc.title }}.*{% endif %}
+
+{% if table_qc_delta %}{{ table_qc_delta }}{% endif %}
+
+---
+
+## 3. Taksonomik profil
+
+{{ table_top_taxa }}
+
+{% if fig_abundance %}![{{ fig_abundance.title }}]({{ fig_abundance.png_path }})
+
+*Şekil {{ fig_abundance.number }}. {{ fig_abundance.title }}.*{% endif %}
+
+---
+
+## 4. Çeşitlilik ve grup karşılaştırması
+
+**Alfa çeşitlilik.** {{ alpha_narrative }}
+
+{{ table_alpha }}
+
+{% if fig_alpha %}![{{ fig_alpha.title }}]({{ fig_alpha.png_path }})
+
+*Şekil {{ fig_alpha.number }}. {{ fig_alpha.title }}.*{% endif %}
+
+**Beta çeşitlilik.** {{ beta_narrative }}
+
+{% if fig_pcoa %}![{{ fig_pcoa.title }}]({{ fig_pcoa.png_path }})
+
+*Şekil {{ fig_pcoa.number }}. {{ fig_pcoa.title }}.*{% endif %}
+
+**Diferansiyel bolluk.** {{ diff_narrative }}
+
+{% if table_diff %}{{ table_diff }}{% endif %}
+
+{% if fig_volcano %}![{{ fig_volcano.title }}]({{ fig_volcano.png_path }})
+
+*Şekil {{ fig_volcano.number }}. {{ fig_volcano.title }}.*{% endif %}
+
+---
+
+{% if table_mag %}## 5. Metagenom-derlenmiş genomlar (MAG)
+
+{{ table_mag }}
+
+{% if fig_mag %}![{{ fig_mag.title }}]({{ fig_mag.png_path }})
+
+*Şekil {{ fig_mag.number }}. {{ fig_mag.title }}.*{% endif %}
+
+---
+{% endif %}
+
+{% if table_amr %}## 6. Fonksiyon / antimikrobiyal direnç (AMR)
+
+{{ table_amr }}
+
+---
+{% endif %}
+
+## 7. Yöntemler
+
+{{ methods }}
+
+## 8. Kaynakça
+
+{% for ref in references %}{{ ref }}
+
+{% endfor %}
