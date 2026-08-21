@@ -20,6 +20,7 @@ work/
 # Results / large data (yalnız istenerek eklenir)
 results/
 data/
+dbs/
 *.fastq
 *.fastq.gz
 *.fq.gz

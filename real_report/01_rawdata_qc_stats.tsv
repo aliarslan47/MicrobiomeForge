@@ -1,0 +1,5 @@
+sample	stage	category	n_reads	total_bases	min_length	median_length	mean_length	max_length	n50	mean_quality	gc_percent
+gut_post_illumina	raw	short	100000	6858521	35	75.0	68.6	76	76	29.52	48.38
+gut_post_nanopore	raw	long	60000	67249413	133	790.0	1120.8	17427	1446	17.2	48.5
+gut_pre_illumina	raw	short	100000	7467386	35	76.0	74.7	76	76	29.96	45.54
+gut_pre_nanopore	raw	long	60000	104789948	139	1467.0	1746.5	12427	2132	17.2	47.71

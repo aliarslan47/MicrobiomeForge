@@ -1,0 +1,5 @@
+sample,run_accession,instrument_platform,fastq_1,fastq_2,fasta
+gut_pre_illumina,day1,ILLUMINA,/home/msi-nb/microbiomeforge/data/pre_Day1_illumina_R1.fastq.gz,/home/msi-nb/microbiomeforge/data/pre_Day1_illumina_R2.fastq.gz,
+gut_post_illumina,day30,ILLUMINA,/home/msi-nb/microbiomeforge/data/post_Day30_illumina_R1.fastq.gz,/home/msi-nb/microbiomeforge/data/post_Day30_illumina_R2.fastq.gz,
+gut_pre_nanopore,day1,OXFORD_NANOPORE,/home/msi-nb/microbiomeforge/data/pre_Day1_nanopore.fastq.gz,,
+gut_post_nanopore,day30,OXFORD_NANOPORE,/home/msi-nb/microbiomeforge/data/post_Day30_nanopore.fastq.gz,,

@@ -1,0 +1,5 @@
+sample	shannon	simpson	richness
+gut_pre_illumina	2.4334	0.8229	74
+gut_post_illumina	1.8929	0.6299	67
+gut_pre_nanopore	3.1644	0.8792	104
+gut_post_nanopore	2.8843	0.8553	89
