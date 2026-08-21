@@ -1,0 +1,7 @@
+sample,fastq_1,fastq_2,long_reads,group,sample_type,platform
+subjectA_pre,data/A_pre_R1.fastq.gz,data/A_pre_R2.fastq.gz,,pre,microbiome,auto
+subjectA_post,data/A_post_R1.fastq.gz,data/A_post_R2.fastq.gz,,post,microbiome,auto
+subjectB_pre,data/B_pre_R1.fastq.gz,data/B_pre_R2.fastq.gz,,pre,microbiome,auto
+subjectB_post,data/B_post_R1.fastq.gz,data/B_post_R2.fastq.gz,,post,microbiome,auto
+soil_site1,,,data/soil1_ont.fastq.gz,environment,microbiota,auto
+soil_site2,,,data/soil2_ont.fastq.gz,environment,microbiota,ont
