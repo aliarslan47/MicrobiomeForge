@@ -19,7 +19,7 @@ nf-core'un ham çıktısını (profil tablosu, MAG kalite, AMR/BGC) **numaralı-
 - Her şekil/tablo numaralı + isimli (Şekil 1., Tablo 1.), metinde atıflı, yayın kalitesinde.
 - İstatistik her zaman vardır (değer + uygun test + etki büyüklüğü + p/q) ve zincir ham okumadan başlar (okuma/taban/uzunluk/Q/GC; trim öncesi→sonrası).
 - Kullanılan her araç versiyon + doğrulanmış DOI ile numaralı kaynakçaya girer. Uydurma yok.
-- Karşılaştırmalı tasarım çekirdektedir: öncesi/sonrası, farklı çevreler, mikrobiyom/mikrobiyota.
+- Karşılaştırmalı tasarım çekirdektedir: öncesi/sonrası, farklı çevreler, mikrobiyom/mikrobiyota. Tekli (betimsel) mi yoksa karşılaştırmalı mı olduğu örnek sayfasındaki `group` metadata'sından çıkarılır ya da açıkça bildirilir (`--design single|comparative`); tutarsız bildirim gürültülü şekilde hata verir.
 - Platform (kısa/uzun okuma) ham datadan otomatik tespit edilir ve sistem ona göre yönlenir.
 
 ## Kurulum

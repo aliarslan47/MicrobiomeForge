@@ -94,3 +94,44 @@ def test_end_to_end_cli(tmp_path):
     # Profil matrisi taxon×örnek.
     prof_df = pd.read_csv(outdir / OUTPUT_FILES["taxonomic_profile"], sep="\t")
     assert set(prof_df["taxon"]) == {"TaxA", "TaxB", "TaxC"}
+
+
+def test_run_analysis_reports_comparative_design_from_metadata(tmp_path):
+    """İki grup → run_analysis karşılaştırmalı tasarımı bildirmeli (PERMANOVA koşar)."""
+    from microbiomeforge.orchestrate import run_analysis
+    from microbiomeforge.pipelines import load_samplesheet, resolve_platforms
+
+    ss, prof, checkm2, amr = _setup(tmp_path)
+    samples = resolve_platforms(load_samplesheet(ss))
+    profiles = {s.sample: str(prof / f"{s.sample}.bracken") for s in samples}
+    res = run_analysis(samples, profiles, tmp_path / "out", tmp_path / "wk")
+    assert res["design"] == "comparative"
+    assert res["permanova_p"] is not None
+
+
+def test_single_design_skips_comparative_stats(tmp_path):
+    """Sisteme 'tekli' denince karşılaştırmalı testler atlanmalı ve not verilmeli."""
+    from microbiomeforge.orchestrate import run_analysis
+    from microbiomeforge.pipelines import load_samplesheet, resolve_platforms
+
+    ss, prof, checkm2, amr = _setup(tmp_path)
+    samples = resolve_platforms(load_samplesheet(ss))
+    profiles = {s.sample: str(prof / f"{s.sample}.bracken") for s in samples}
+    res = run_analysis(samples, profiles, tmp_path / "out", tmp_path / "wk", design="single")
+    assert res["design"] == "single"
+    assert res["permanova_p"] is None          # karşılaştırma atlandı
+    assert res["n_significant_taxa"] == 0
+    assert "atlan" in res["design_note"].lower()
+
+
+def test_cli_declared_comparative_on_single_group_fails(tmp_path):
+    """CLI --design comparative ama tek grup → gürültülü hata (rc!=0)."""
+    ss, prof, checkm2, amr = _setup(tmp_path)
+    # Tüm örnekleri tek gruba indir.
+    df = pd.read_csv(ss); df["group"] = "cohort"; df.to_csv(ss, index=False)
+    rc = main([
+        "run", "--samplesheet", str(ss), "--profiles-dir", str(prof),
+        "--outdir", str(tmp_path / "results"), "--workdir", str(tmp_path / "work"),
+        "--design", "comparative",
+    ])
+    assert rc != 0

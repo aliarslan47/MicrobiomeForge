@@ -16,10 +16,12 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from .detect import Platform, detect_sample
 from .references import ToolRegistry
+
+DesignKind = Literal["single", "comparative"]
 
 REQUIRED_COLUMNS = {"sample", "group"}
 VALID_SAMPLE_TYPES = {"microbiome", "microbiota", "environment"}
@@ -79,6 +81,63 @@ def load_samplesheet(path: str | Path) -> list[Sample]:
         # Karşılaştırmalı tasarım çekirdekte; tek grup uyarısı.
         pass  # tek gruplu betimsel koşuya izin ver, ama istatistik modülü uyaracak.
     return samples
+
+
+@dataclass(frozen=True)
+class DesignSpec:
+    """Çalışmanın tekli mi (betimsel) yoksa karşılaştırmalı mı olduğunun çözümü.
+
+    İki kaynaktan gelebilir:
+      * metadata: örnek sayfasındaki `group` sütununun benzersiz değer sayısı,
+      * açık bildirim (`declared`): kullanıcı/CLI sisteme doğrudan söyler.
+    Açık bildirim metadata'yı ezer (declared=True), ama tutarsızlıkta gürültü çıkarır.
+    """
+    kind: DesignKind          # single | comparative
+    n_groups: int
+    groups: list[str]
+    declared: bool            # True: kullanıcı açıkça söyledi; False: metadata'dan çıkarıldı
+    note: str                 # rapora/loga düşecek insan-okur açıklama
+
+
+def resolve_design(
+    samples: list[Sample],
+    declared: Optional[DesignKind] = None,
+) -> DesignSpec:
+    """Tasarımı çözer.
+
+    - declared=None            → group metadata'sından çıkar: >=2 grup=comparative, 1=single.
+    - declared="comparative"   → en az 2 grup şart; değilse ValueError (gürültülü hata).
+    - declared="single"        → betimsel koşuya zorla; birden çok grup varsa
+                                  "karşılaştırmalı testler atlanacak" uyarısı notu.
+    """
+    groups = sorted({s.group for s in samples})
+    n = len(groups)
+
+    if declared == "comparative":
+        if n < 2:
+            raise ValueError(
+                f"'karşılaştırmalı' tasarım istendi ama yalnız {n} grup var "
+                f"({groups}); en az 2 grup gerekli."
+            )
+        return DesignSpec("comparative", n, groups, declared=True,
+                          note=f"Karşılaştırmalı tasarım (açıkça bildirildi): {n} grup {groups}.")
+
+    if declared == "single":
+        if n > 1:
+            note = (f"Tekli/betimsel tasarım açıkça istendi; veride {n} grup {groups} "
+                    f"bulunsa da karşılaştırmalı testler (grup karşılaştırması, PERMANOVA, "
+                    f"diferansiyel bolluk) ATLANACAK.")
+        else:
+            note = "Tekli/betimsel tasarım (açıkça bildirildi)."
+        return DesignSpec("single", n, groups, declared=True, note=note)
+
+    # metadata'dan çıkarım
+    if n >= 2:
+        return DesignSpec("comparative", n, groups, declared=False,
+                          note=f"Karşılaştırmalı tasarım (metadata'dan): {n} grup {groups}.")
+    return DesignSpec("single", n, groups, declared=False,
+                      note=(f"Tekli/betimsel tasarım (metadata'dan): tek grup {groups}. "
+                            f"Karşılaştırmalı testler uygulanmayacak."))
 
 
 def resolve_platforms(samples: list[Sample], detect: bool = True, max_reads: int = 5000) -> list[Sample]:

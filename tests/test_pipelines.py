@@ -9,6 +9,7 @@ from microbiomeforge.pipelines import (
     Sample,
     load_samplesheet,
     plan_pipelines,
+    resolve_design,
     resolve_platforms,
 )
 from microbiomeforge.references import ToolRegistry
@@ -83,6 +84,40 @@ def test_plan_routes_and_registers_tools():
     # kullanılan araçlar kaynakçaya işlendi
     keys = {r.key for r in reg.bibliography()}
     assert {"kraken2", "sylph", "semibin2", "metamdbg"} <= keys
+
+
+def test_design_inferred_comparative_from_metadata():
+    """İki grup metadata'da → karşılaştırmalı (kullanıcı söylemese de)."""
+    samples = [Sample("s1", "pre", fastq_1="x.fq"), Sample("s2", "post", fastq_1="y.fq")]
+    d = resolve_design(samples)
+    assert d.kind == "comparative"
+    assert d.n_groups == 2
+    assert d.declared is False
+
+
+def test_design_inferred_single_from_metadata():
+    """Tek grup metadata'da → tekli/betimsel."""
+    samples = [Sample("s1", "cohort", fastq_1="x.fq"), Sample("s2", "cohort", fastq_1="y.fq")]
+    d = resolve_design(samples)
+    assert d.kind == "single"
+    assert d.n_groups == 1
+    assert d.declared is False
+
+
+def test_design_declared_comparative_with_one_group_raises():
+    """Sisteme 'karşılaştırmalı' denmiş ama tek grup var → gürültülü hata."""
+    samples = [Sample("s1", "cohort", fastq_1="x.fq"), Sample("s2", "cohort", fastq_1="y.fq")]
+    with pytest.raises(ValueError, match="karşılaştırmalı"):
+        resolve_design(samples, declared="comparative")
+
+
+def test_design_declared_single_overrides_multiple_groups():
+    """Sisteme 'tekli' denmiş ama 2 grup var → tekli'ye zorla + uyarı notu."""
+    samples = [Sample("s1", "pre", fastq_1="x.fq"), Sample("s2", "post", fastq_1="y.fq")]
+    d = resolve_design(samples, declared="single")
+    assert d.kind == "single"
+    assert d.declared is True
+    assert "atlan" in d.note.lower()  # karşılaştırmalı testler atlanacak uyarısı
 
 
 def test_command_uses_podman_profile():

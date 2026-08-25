@@ -45,17 +45,24 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("HATA: hiçbir örnek için profil bulunamadı.", file=sys.stderr)
         return 2
 
-    result = run_analysis(
-        samples=[s for s in samples if s.sample in profile_files],
-        profile_files=profile_files,
-        outdir=args.outdir,
-        workdir=args.workdir or (Path(args.outdir).parent / ".microbiomeforge_work"),
-        checkm2_file=args.checkm2,
-        amr_file=args.amr,
-        project=args.project,
-    )
+    design = None if args.design == "auto" else args.design
+    try:
+        result = run_analysis(
+            samples=[s for s in samples if s.sample in profile_files],
+            profile_files=profile_files,
+            outdir=args.outdir,
+            workdir=args.workdir or (Path(args.outdir).parent / ".microbiomeforge_work"),
+            checkm2_file=args.checkm2,
+            amr_file=args.amr,
+            project=args.project,
+            design=design,
+        )
+    except ValueError as e:
+        print(f"HATA: {e}", file=sys.stderr)
+        return 2
     print(f"Tamamlandı: {result['outdir']}")
-    print(f"  Örnek: {result['n_samples']} · PERMANOVA p={result['permanova_p']} · "
+    print(f"  Örnek: {result['n_samples']} · tasarım={result['design']} · "
+          f"PERMANOVA p={result['permanova_p']} · "
           f"anlamlı takson={result['n_significant_taxa']} · kaynak={result['n_references']}")
     rep = result["report"].get("pdf") or result["report"].get("markdown")
     print(f"  Rapor: {rep}")
@@ -75,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--amr", default=None, help="funcscan/AMR tablosu")
     r.add_argument("--project", default="MicrobiomeForge")
     r.add_argument("--no-detect", action="store_true", help="Platform otomatik tespitini kapat")
+    r.add_argument("--design", choices=["auto", "single", "comparative"], default="auto",
+                   help="Çalışma tasarımı: auto=group metadata'sından çıkar (varsayılan), "
+                        "single=tekli/betimsel, comparative=karşılaştırmalı")
     r.set_defaults(func=cmd_run)
     return p
 

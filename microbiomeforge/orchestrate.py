@@ -14,6 +14,7 @@ alıp raporu üretir; böylece rapor katmanı nf-core'dan bağımsız test edile
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -22,7 +23,7 @@ import pandas as pd
 from . import figures as figmod
 from . import parsers, report, stats
 from .outputs import output_path, write_table
-from .pipelines import Sample, plan_pipelines
+from .pipelines import DesignKind, Sample, plan_pipelines, resolve_design
 from .qc_stats import compute_raw_stats, qc_delta, qc_table
 from .references import ToolRegistry
 
@@ -35,6 +36,7 @@ def run_analysis(
     checkm2_file: Optional[str] = None,
     amr_file: Optional[str] = None,
     project: str = "MicrobiomeForge",
+    design: Optional[DesignKind] = None,  # None=metadata'dan çıkar; "single"|"comparative"=açık bildirim
 ) -> dict:
     outdir, workdir = Path(outdir), Path(workdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +44,11 @@ def run_analysis(
 
     registry = ToolRegistry()
     groups = {s.sample: s.group for s in samples}
+
+    # Tasarım çözümü: metadata (group sütunu) ya da açık bildirim (design=...).
+    dspec = resolve_design(samples, declared=design)
+    # Kararı gürültülü şekilde bildir (sessiz varsayım yok).
+    print(f"[MicrobiomeForge] Tasarım: {dspec.kind} — {dspec.note}", file=sys.stderr)
 
     # nf-core plan → hangi araçlar kullanıldı (kaynakça).
     plan_pipelines(samples, registry)
@@ -64,14 +71,19 @@ def run_analysis(
     matrix = parsers.build_abundance_matrix(per_sample)
     write_table(matrix, outdir, "taxonomic_profile")
 
-    # --- 03: Çeşitlilik + karşılaştırma ---
+    # --- 03: Çeşitlilik (+ tasarım karşılaştırmalıysa grup testleri) ---
     alpha = stats.alpha_diversity(matrix)
     write_table(alpha, outdir, "diversity_stats")
-    at = stats.compare_alpha(alpha, groups, metric="shannon")
     D = stats.bray_curtis_matrix(matrix)
-    perm = stats.permanova(D, groups)
     coords = stats.pcoa(D)
-    diff = stats.differential_abundance(matrix, groups)
+    if dspec.kind == "comparative":
+        at = stats.compare_alpha(alpha, groups, metric="shannon")
+        perm = stats.permanova(D, groups)
+        diff = stats.differential_abundance(matrix, groups)
+    else:
+        # Tekli/betimsel: gruplar arası karşılaştırma yapılmaz.
+        at = perm = None
+        diff = pd.DataFrame()
 
     # --- 04: MAG kalite ---
     mag_df = None
@@ -92,25 +104,34 @@ def run_analysis(
     fi["abundance"] = figs.abundance_bar(matrix)
     fi["alpha"] = figs.alpha_box(alpha, groups)
     fi["pcoa"] = figs.pcoa_scatter(coords, groups)
-    fi["volcano"] = figs.volcano(diff)
+    if dspec.kind == "comparative" and not diff.empty:
+        fi["volcano"] = figs.volcano(diff)
     if mag_df is not None and not mag_df.empty:
         fi["mag"] = figs.mag_quality(mag_df)
     figs.compile_pdf(output_path(outdir, "figures"))
 
     # --- Anlatı metinleri (istatistikten) ---
-    alpha_text = (
-        f"Shannon çeşitliliği gruplar arasında {at.test} ile karşılaştırıldı "
-        f"(istatistik={at.statistic:.3g}, p={at.p_value:.3g}, etki={at.effect:.3g})."
-    )
-    beta_text = (
-        f"Bray-Curtis mesafesi üzerinde PERMANOVA gruplar arası ayrımı test etti "
-        f"(pseudo-F={perm.pseudo_f:.3g}, p={perm.p_value:.3g}, {perm.permutations} permütasyon)."
-    )
-    n_sig = int(diff["significant"].sum()) if "significant" in diff else 0
-    diff_text = (
-        f"CLR-tabanlı taxon-başı test + BH-FDR ile {n_sig} takson anlamlı (q<0.05) "
-        f"diferansiyel bolluk gösterdi."
-    )
+    if dspec.kind == "comparative":
+        alpha_text = (
+            f"Shannon çeşitliliği gruplar arasında {at.test} ile karşılaştırıldı "
+            f"(istatistik={at.statistic:.3g}, p={at.p_value:.3g}, etki={at.effect:.3g})."
+        )
+        beta_text = (
+            f"Bray-Curtis mesafesi üzerinde PERMANOVA gruplar arası ayrımı test etti "
+            f"(pseudo-F={perm.pseudo_f:.3g}, p={perm.p_value:.3g}, {perm.permutations} permütasyon)."
+        )
+        n_sig = int(diff["significant"].sum()) if "significant" in diff else 0
+        diff_text = (
+            f"CLR-tabanlı taxon-başı test + BH-FDR ile {n_sig} takson anlamlı (q<0.05) "
+            f"diferansiyel bolluk gösterdi."
+        )
+    else:
+        n_sig = 0
+        alpha_text = ("Tekli/betimsel tasarım: alfa çeşitliliği örnekler için betimsel "
+                      "olarak raporlandı; gruplar arası karşılaştırma yapılmadı.")
+        beta_text = ("Betimsel beta-çeşitlilik (Bray-Curtis + PCoA) sunuldu; "
+                     "PERMANOVA gibi grup-ayrım testleri uygulanmadı.")
+        diff_text = "Diferansiyel bolluk testi tekli tasarımda uygulanmadı."
 
     # --- 07: Rapor ---
     ctx = report.ReportContext(
@@ -123,8 +144,9 @@ def run_analysis(
         qc_delta_df=delta_df, mag_df=mag_df, amr_df=amr_df,
         alpha_test_text=alpha_text, beta_test_text=beta_text, diff_text=diff_text,
         summary=(
-            f"{len(samples)} örnek ({', '.join(sorted({s.group for s in samples}))} grupları) "
-            f"karşılaştırmalı olarak analiz edildi."
+            f"{len(samples)} örnek ({', '.join(dspec.groups)} grubu/grupları) "
+            f"{'karşılaştırmalı' if dspec.kind == 'comparative' else 'tekli/betimsel'} "
+            f"olarak analiz edildi. {dspec.note}"
         ),
         fig_index=fi,
     )
@@ -133,7 +155,9 @@ def run_analysis(
     return {
         "outdir": str(outdir),
         "n_samples": len(samples),
-        "permanova_p": perm.p_value,
+        "design": dspec.kind,
+        "design_note": dspec.note,
+        "permanova_p": perm.p_value if perm is not None else None,
         "n_significant_taxa": n_sig,
         "report": report_out,
         "n_references": len(registry.bibliography()),

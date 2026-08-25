@@ -19,7 +19,7 @@ It converts nf-core's raw output (profile table, MAG quality, AMR/BGC) into an i
 - Every figure/table is numbered + named (Figure 1., Table 1.), cited in text, publication-quality.
 - Statistics are always present (value + appropriate test + effect size + p/q), and the chain starts from the raw reads (reads/base/length/Q/GC; before→after trim).
 - Every tool used enters a numbered bibliography with version + verified DOI. No fabrication.
-- Comparative design is core: before/after, different environments, microbiome/microbiota.
+- Comparative design is core: before/after, different environments, microbiome/microbiota. Single (descriptive) vs comparative is taken from the samplesheet `group` metadata or declared explicitly (`--design single|comparative`); an inconsistent declaration fails loudly.
 - Platform (short/long reads) is auto-detected from the raw data and the system routes accordingly.
 
 ## Installation
