@@ -8,6 +8,8 @@ Ham metagenomik okumadan (FASTQ) **karşılaştırmalı, istatistiksel ve litera
 
 **Türkçe** · [English](README.md)
 
+Etkileşimli çift dilli düğüm grafiği: **[render edilmiş diyagram](https://aliarslan47.github.io/MicrobiomeForge/pipeline_architecture.html)** (`docs/pipeline_architecture.html`).
+
 ## Nedir?
 
 MicrobiomeForge, Forge ailesinin mikrobiyom üyesidir. Yeni bir hizalayıcı/sınıflandırıcı **geliştirmez** — araç kurulumu ve entegrasyonu problemi zaten [nf-core](https://nf-co.re) pipeline'larıyla (taxprofiler, mag, funcscan, ampliseq) çözülmüştür. MicrobiomeForge bunları **çalışma motoru** olarak kullanır ve üstüne kendi katmanını ekler: nf-core'un ham çıktısını yorumlanmış bir rapora çevirmek.

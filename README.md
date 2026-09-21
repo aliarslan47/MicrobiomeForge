@@ -8,6 +8,8 @@ A layer that turns raw metagenomic reads (FASTQ) into a **comparative, statistic
 
 [Türkçe](README.tr.md) · **English**
 
+Interactive bilingual node-graph: **[rendered diagram](https://aliarslan47.github.io/MicrobiomeForge/pipeline_architecture.html)** (`docs/pipeline_architecture.html`).
+
 ## What is it?
 
 MicrobiomeForge is the microbiome member of the Forge family. It does **not** build a new aligner/classifier — tool installation and integration are already solved by the [nf-core](https://nf-co.re) pipelines (taxprofiler, mag, funcscan, ampliseq). MicrobiomeForge uses those as its **engine** and adds its own layer on top: turning nf-core's raw output into an interpreted report.

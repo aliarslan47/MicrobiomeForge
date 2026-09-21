@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MicrobiomeForge Pipeline DAG</title>
+<style>
+  :root{
+    --bg:#eef1f4; --card:#ffffff; --node:#ffffff; --bd:#dfe4e9; --ink:#161b21; --mut:#69737d;
+    --grid:#dbe1e7; --dec:#8a5cd0; --na-tx:#96a0a9;
+    --sh:#0d6b8f; --sh-bg:#e7f0f5; --engine:#2f8f5b; --engine-bg:#e4f1ea; --interp:#c07211; --interp-bg:#f7ecdb; --out:#7d6fae; --out-bg:#eeeaf6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0c1014; --card:#141920; --node:#1b2129; --bd:#28303a; --ink:#e7ebef; --mut:#8a95a0;
+      --grid:#20272f; --dec:#b28cf0; --na-tx:#5c6771;
+      --sh:#4bb3d6; --sh-bg:#12303c; --engine:#5cc08a; --engine-bg:#15321f; --interp:#e0a24e; --interp-bg:#3a2c16; --out:#a99bd0; --out-bg:#221d33;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0c1014; --card:#141920; --node:#1b2129; --bd:#28303a; --ink:#e7ebef; --mut:#8a95a0;
+    --grid:#20272f; --dec:#b28cf0; --na-tx:#5c6771;
+    --sh:#4bb3d6; --sh-bg:#12303c; --engine:#5cc08a; --engine-bg:#15321f; --interp:#e0a24e; --interp-bg:#3a2c16; --out:#a99bd0; --out-bg:#221d33;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;padding:30px 22px 38px}
+  .wrap{max-width:1180px;margin:0 auto}
+  .toggle{display:flex;justify-content:flex-end;margin-bottom:14px}
+  .toggle .grp{display:inline-flex;border:1px solid var(--bd);border-radius:999px;overflow:hidden;background:var(--card)}
+  .langbtn{border:0;background:transparent;color:var(--mut);font:600 12.5px system-ui;
+    padding:6px 16px;cursor:pointer;letter-spacing:.3px}
+  .langbtn.on{background:var(--sh);color:#fff}
+  .langbtn:focus-visible{outline:2px solid var(--sh);outline-offset:2px}
+  header{margin-bottom:22px}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.4px;text-wrap:balance}
+  .sub{color:var(--mut);font-size:13.5px;margin:0;max-width:74ch}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  h2{font-size:15.5px;margin:32px 0 12px;letter-spacing:-.2px}
+  .page[hidden]{display:none}
+  .canvas{position:relative;background:var(--card);border:1px solid var(--bd);border-radius:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:auto;max-height:84vh}
+  .bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;
+    padding:9px 14px;background:var(--card);border-bottom:1px solid var(--bd)}
+  .bar .fn{font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)}
+  .bar .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .bar .sp{flex:1}
+  .chips{display:flex;gap:12px;font-size:11.5px;flex-wrap:wrap}
+  .chips span{display:inline-flex;align-items:center;gap:6px;color:var(--mut)}
+  .chips i{width:11px;height:11px;border-radius:3px;display:inline-block;border:1.4px solid}
+  .chips i.dash{border-style:dashed}
+  svg.dag{display:block;min-width:1040px}
+  .node{fill:var(--node)}
+  .chip-t{fill:#fff;font-family:ui-monospace,monospace;font-weight:700;font-size:11px}
+  .nname{fill:var(--ink);font-size:12.5px;font-weight:600}
+  .ntool{fill:var(--mut);font-size:9.5px;font-family:ui-monospace,monospace}
+  .edge{fill:none;stroke-width:1.9}
+  .decision{fill:var(--node);stroke:var(--dec);stroke-width:1.6}
+  .dec-t{fill:var(--dec);font-size:11px;font-weight:700;font-family:ui-monospace,monospace}
+  .dec-s{fill:var(--mut);font-size:9px}
+  .hublbl{fill:var(--mut);font-size:9.5px;font-style:italic}
+  .n-sh{stroke:var(--sh);stroke-width:1.6}
+  .chip-sh{fill:var(--sh)}
+  .port-sh{fill:var(--sh);stroke:var(--node);stroke-width:1.5}
+  .e-sh{stroke:var(--sh);}
+  .i-sh{background:var(--sh-bg);border-color:var(--sh)}
+  .tag.sh{background:var(--sh-bg);color:var(--sh)}
+  .n-engine{stroke:var(--engine);stroke-width:1.6}
+  .chip-engine{fill:var(--engine)}
+  .port-engine{fill:var(--engine);stroke:var(--node);stroke-width:1.5}
+  .e-engine{stroke:var(--engine);}
+  .i-engine{background:var(--engine-bg);border-color:var(--engine)}
+  .tag.engine{background:var(--engine-bg);color:var(--engine)}
+  .n-interp{stroke:var(--interp);stroke-width:1.6}
+  .chip-interp{fill:var(--interp)}
+  .port-interp{fill:var(--interp);stroke:var(--node);stroke-width:1.5}
+  .e-interp{stroke:var(--interp);}
+  .i-interp{background:var(--interp-bg);border-color:var(--interp)}
+  .tag.interp{background:var(--interp-bg);color:var(--interp)}
+  .n-out{stroke:var(--out);stroke-width:1.6}
+  .chip-out{fill:var(--out)}
+  .port-out{fill:var(--out);stroke:var(--node);stroke-width:1.5}
+  .e-out{stroke:var(--out);}
+  .i-out{background:var(--out-bg);border-color:var(--out)}
+  .tag.out{background:var(--out-bg);color:var(--out)}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:12px;background:var(--card);margin-top:12px}
+  table{width:100%;border-collapse:collapse;min-width:680px}
+  th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--bd);font-size:13px;vertical-align:top}
+  thead th{background:var(--sh-bg);color:var(--sh);font-size:11px;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr:last-child td{border-bottom:none}
+  td.code{font-family:ui-monospace,monospace;font-weight:700;color:var(--sh);white-space:nowrap}
+  td.mod{font-weight:600;white-space:nowrap}
+  td.dep{font-family:ui-monospace,monospace;font-size:12px;color:var(--mut);white-space:nowrap}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px}
+  .envs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .env{font-family:ui-monospace,monospace;font-size:12px;background:var(--card);border:1px solid var(--bd);
+    border-radius:7px;padding:4px 10px}
+  .env b{color:var(--sh)}
+  footer{margin-top:28px;padding-top:15px;border-top:1px solid var(--bd);color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="toggle">
+    <div class="grp" role="group" aria-label="Language / Dil">
+      <button class="langbtn on" data-lang="tr" aria-pressed="true">Türkçe</button>
+      <button class="langbtn" data-lang="en" aria-pressed="false">English</button>
+    </div>
+  </div>
+
+  <div class="page" data-lang="tr">
+    <header>
+      <h1>MicrobiomeForge Pipeline DAG</h1>
+      <p class="sub">Gerçek run() bağımlılık grafiği. MicrobiomeForge kendi hizalayıcı/sınıflandırıcı YAZMAZ; nf-core motorlarını (taxprofiler · mag · funcscan) sürer ve üstüne "yorumlanmış rapor" katmanı ekler. Omurga girdi→QC→samplesheet/plan; plandan üç nf-core motoru dallanır (funcscan MAG'lara bağlı), çıktıları ayrıştırılıp istatistik (çeşitlilik·PERMANOVA·diferansiyel bolluk) ile yorumlanır, 01–07 numaralı çıktılara akar. Platform (kısa/uzun okuma) araç düzeyinde dik eksendir.</p>
+    </header>
+
+    <figure style="margin:0">
+    <div class="canvas">
+      <div class="bar">
+        <span class="dot" style="background:#e0605a"></span>
+        <span class="dot" style="background:#e0b64e"></span>
+        <span class="dot" style="background:#5bb87a"></span>
+        <span class="fn">microbiomeforge · pipeline.dag</span>
+        <span class="sp"></span>
+        <span class="chips">
+          <span><i class="i-sh"></i> ortak</span>
+          <span><i class="i-engine"></i> nf-core motoru</span>
+          <span><i class="i-interp"></i> yorum</span>
+          <span><i class="i-out"></i> çıktı</span>
+        </span>
+      </div>
+      <svg class="dag" viewBox="0 0 1040 800" role="img" aria-label="MicrobiomeForge pipeline DAG. Omurga girdi QC plan. Üç nf-core motoru taxprofiler mag funcscan. Yorum katmanı çıktı 01-07.">
+  <defs>
+    <pattern id="grid-tr" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="var(--grid)"/></pattern>
+    <marker id="ah-tr" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="context-stroke"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1040" height="800" fill="url(#grid-tr)"/>
+  <path class="edge e-sh" marker-end="url(#ah-tr)" d="M520 80 C520 106 520 84 520 110"/>
+  <path class="edge e-sh" marker-end="url(#ah-tr)" d="M520 166 C520 192 520 170 520 196"/>
+  <path class="edge e-engine" marker-end="url(#ah-tr)" d="M520 252 C520 389 200 183 200 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-tr)" d="M520 252 C520 281 520 291 520 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-tr)" d="M520 252 C520 389 840 183 840 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-tr)" d="M615 348 C670 348 690 348 745 348"/>
+  <path class="edge e-interp" marker-end="url(#ah-tr)" d="M200 376 C200 402 200 404 200 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-tr)" d="M520 376 C520 402 520 404 520 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-tr)" d="M840 376 C840 402 840 404 840 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-tr)" d="M200 486 C200 512 200 502 200 528"/>
+  <path class="edge e-out" marker-end="url(#ah-tr)" d="M200 486 C200 633 520 479 520 626"/>
+  <path class="edge e-out" marker-end="url(#ah-tr)" d="M200 584 C200 683 326 654 425 654"/>
+  <path class="edge e-out" marker-end="url(#ah-tr)" d="M520 486 C520 545 520 567 520 626"/>
+  <path class="edge e-out" marker-end="url(#ah-tr)" d="M840 486 C840 604 733 654 615 654"/>
+  <path class="edge e-out" marker-end="url(#ah-tr)" d="M520 682 C520 708 520 686 520 712"/>
+  <g><rect class="node n-sh" x="425" y="24" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="34" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="47" text-anchor="middle">M0</text><text class="nname" x="483" y="48">Girdi + Platform</text><text class="ntool" x="437" y="69">detect (kısa/uzun)</text><circle class="port-sh" cx="520" cy="24" r="4"/><circle class="port-sh" cx="520" cy="80" r="4"/></g>
+  <g><rect class="node n-sh" x="425" y="110" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="120" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="133" text-anchor="middle">M1</text><text class="nname" x="483" y="134">QC İstatistik</text><text class="ntool" x="437" y="155">fastp/NanoPlot → 01</text><circle class="port-sh" cx="520" cy="110" r="4"/><circle class="port-sh" cx="520" cy="166" r="4"/></g>
+  <g><rect class="node n-sh" x="425" y="196" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="206" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="219" text-anchor="middle">PLAN</text><text class="nname" x="483" y="220">Samplesheet + Plan</text><text class="ntool" x="437" y="241">nf-core planlama</text><circle class="port-sh" cx="520" cy="196" r="4"/><circle class="port-sh" cx="520" cy="252" r="4"/></g>
+  <g><rect class="node n-engine" x="105" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="115" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="343" text-anchor="middle">TAX</text><text class="nname" x="163" y="344">taxprofiler</text><text class="ntool" x="117" y="365">Kraken2·Bracken·sylph</text><circle class="port-engine" cx="200" cy="320" r="4"/><circle class="port-engine" cx="200" cy="376" r="4"/></g>
+  <g><rect class="node n-engine" x="425" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="435" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="343" text-anchor="middle">MAG</text><text class="nname" x="483" y="344">mag</text><text class="ntool" x="437" y="365">metaSPAdes/Flye·SemiBin2·CheckM2</text><circle class="port-engine" cx="520" cy="320" r="4"/><circle class="port-engine" cx="520" cy="376" r="4"/></g>
+  <g><rect class="node n-engine" x="745" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="755" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="775" y="343" text-anchor="middle">FUNC</text><text class="nname" x="803" y="344">funcscan</text><text class="ntool" x="757" y="365">AMR + BGC (MAG'larda)</text><circle class="port-engine" cx="840" cy="320" r="4"/><circle class="port-engine" cx="840" cy="376" r="4"/></g>
+  <g><rect class="node n-interp" x="105" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="115" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="453" text-anchor="middle">P02</text><text class="nname" x="163" y="454">02 Taksonomik Profil</text><text class="ntool" x="117" y="475">parse taxprofiler</text><circle class="port-interp" cx="200" cy="430" r="4"/><circle class="port-interp" cx="200" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="425" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="435" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="453" text-anchor="middle">P04</text><text class="nname" x="483" y="454">04 MAG Kalite</text><text class="ntool" x="437" y="475">parse mag (CheckM2)</text><circle class="port-interp" cx="520" cy="430" r="4"/><circle class="port-interp" cx="520" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="745" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="755" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="775" y="453" text-anchor="middle">P05</text><text class="nname" x="803" y="454">05 AMR / BGC</text><text class="ntool" x="757" y="475">parse funcscan</text><circle class="port-interp" cx="840" cy="430" r="4"/><circle class="port-interp" cx="840" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="105" y="528" width="190" height="56" rx="11"/><rect class="chip-interp" x="115" y="538" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="551" text-anchor="middle">STAT</text><text class="nname" x="163" y="552">03 Çeşitlilik + İstatistik</text><text class="ntool" x="117" y="573">α/β · PERMANOVA · dif. bolluk</text><circle class="port-interp" cx="200" cy="528" r="4"/><circle class="port-interp" cx="200" cy="584" r="4"/></g>
+  <g><rect class="node n-out" x="425" y="626" width="190" height="56" rx="11"/><rect class="chip-out" x="435" y="636" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="649" text-anchor="middle">FIG</text><text class="nname" x="483" y="650">06 Şekiller</text><text class="ntool" x="437" y="671">yayın-kalite PDF</text><circle class="port-out" cx="520" cy="626" r="4"/><circle class="port-out" cx="520" cy="682" r="4"/></g>
+  <g><rect class="node n-out" x="425" y="712" width="190" height="56" rx="11"/><rect class="chip-out" x="435" y="722" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="735" text-anchor="middle">REP</text><text class="nname" x="483" y="736">07 Rapor</text><text class="ntool" x="437" y="757">Jinja2 → MD → PDF</text><circle class="port-out" cx="520" cy="712" r="4"/><circle class="port-out" cx="520" cy="768" r="4"/></g>
+  <text class="hublbl" x="660" y="250" text-anchor="middle">plan → 3 motor</text>
+</svg>
+    </div>
+    </figure>
+
+    <h2>Modül matrisi — araçlar &amp; bağımlılık</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:52px">Kod</th><th style="width:170px">Modül</th><th style="width:110px">Bağımlılık</th><th>Araç &amp; işlev</th></tr></thead>
+      <tbody>
+        <tr><td class="code">M0</td><td class="mod">Girdi + Platform <span class="tag sh">ORTAK</span></td><td class="dep">—</td><td>detect (kısa/uzun)</td></tr>
+        <tr><td class="code">M1</td><td class="mod">QC İstatistik <span class="tag sh">ORTAK</span></td><td class="dep">M0</td><td>fastp/NanoPlot → 01</td></tr>
+        <tr><td class="code">PLAN</td><td class="mod">Samplesheet + Plan <span class="tag sh">ORTAK</span></td><td class="dep">M1</td><td>nf-core planlama</td></tr>
+        <tr><td class="code">TAX</td><td class="mod">taxprofiler <span class="tag engine">NF-CORE MOTORU</span></td><td class="dep">PLAN</td><td>Kraken2·Bracken·sylph</td></tr>
+        <tr><td class="code">MAG</td><td class="mod">mag <span class="tag engine">NF-CORE MOTORU</span></td><td class="dep">PLAN</td><td>metaSPAdes/Flye·SemiBin2·CheckM2</td></tr>
+        <tr><td class="code">FUNC</td><td class="mod">funcscan <span class="tag engine">NF-CORE MOTORU</span></td><td class="dep">MAG</td><td>AMR + BGC (MAG'larda)</td></tr>
+        <tr><td class="code">P02</td><td class="mod">02 Taksonomik Profil <span class="tag interp">YORUM</span></td><td class="dep">TAX</td><td>parse taxprofiler</td></tr>
+        <tr><td class="code">P04</td><td class="mod">04 MAG Kalite <span class="tag interp">YORUM</span></td><td class="dep">MAG</td><td>parse mag (CheckM2)</td></tr>
+        <tr><td class="code">P05</td><td class="mod">05 AMR / BGC <span class="tag interp">YORUM</span></td><td class="dep">FUNC</td><td>parse funcscan</td></tr>
+        <tr><td class="code">STAT</td><td class="mod">03 Çeşitlilik + İstatistik <span class="tag interp">YORUM</span></td><td class="dep">P02</td><td>α/β · PERMANOVA · dif. bolluk</td></tr>
+        <tr><td class="code">FIG</td><td class="mod">06 Şekiller <span class="tag out">ÇIKTI</span></td><td class="dep">P02–P05 + 03</td><td>yayın-kalite PDF</td></tr>
+        <tr><td class="code">REP</td><td class="mod">07 Rapor <span class="tag out">ÇIKTI</span></td><td class="dep">FIG</td><td>Jinja2 → MD → PDF</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>İzole conda ortamları</h2>
+    <div class="envs">
+      <span class="env"><b>nextflow</b> · ana</span><span class="env"><b>nf-core/taxprofiler</b></span><span class="env"><b>nf-core/mag</b></span><span class="env"><b>nf-core/funcscan</b></span><span class="env"><b>microbiomeforge</b></span>
+    </div>
+    <footer>MicrobiomeForge · nf-core motoru üstünde yorumlanmış-rapor katmanı · github.com/aliarslan47/MicrobiomeForge. Kenarlar gerçek çıktı-bağımlılıklarından çıkarıldı: funcscan ← mag (MAG'lar), 03 çeşitlilik ← 02 profil. Kısa: taxprofiler Kraken2/Bracken, mag metaSPAdes; uzun: taxprofiler sylph, mag metaFlye/metaMDBG.</footer>
+  </div>
+
+  <div class="page" data-lang="en" hidden>
+    <header>
+      <h1>MicrobiomeForge Pipeline DAG</h1>
+      <p class="sub">The real run() dependency graph. MicrobiomeForge writes NO aligner/classifier of its own; it drives the nf-core engines (taxprofiler · mag · funcscan) and adds an "interpreted report" layer on top. Spine input→QC→samplesheet/plan; three nf-core engines branch off the plan (funcscan depends on the MAGs), their outputs are parsed and interpreted with statistics (diversity · PERMANOVA · differential abundance), flowing into numbered outputs 01–07. Read type (short/long) is an orthogonal, tool-level axis.</p>
+    </header>
+
+    <figure style="margin:0">
+    <div class="canvas">
+      <div class="bar">
+        <span class="dot" style="background:#e0605a"></span>
+        <span class="dot" style="background:#e0b64e"></span>
+        <span class="dot" style="background:#5bb87a"></span>
+        <span class="fn">microbiomeforge · pipeline.dag</span>
+        <span class="sp"></span>
+        <span class="chips">
+          <span><i class="i-sh"></i> shared</span>
+          <span><i class="i-engine"></i> nf-core engine</span>
+          <span><i class="i-interp"></i> interpret</span>
+          <span><i class="i-out"></i> output</span>
+        </span>
+      </div>
+      <svg class="dag" viewBox="0 0 1040 800" role="img" aria-label="MicrobiomeForge pipeline DAG. Spine input QC plan. Three nf-core engines taxprofiler mag funcscan. Interpret layer outputs 01-07.">
+  <defs>
+    <pattern id="grid-en" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="var(--grid)"/></pattern>
+    <marker id="ah-en" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="context-stroke"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1040" height="800" fill="url(#grid-en)"/>
+  <path class="edge e-sh" marker-end="url(#ah-en)" d="M520 80 C520 106 520 84 520 110"/>
+  <path class="edge e-sh" marker-end="url(#ah-en)" d="M520 166 C520 192 520 170 520 196"/>
+  <path class="edge e-engine" marker-end="url(#ah-en)" d="M520 252 C520 389 200 183 200 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-en)" d="M520 252 C520 281 520 291 520 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-en)" d="M520 252 C520 389 840 183 840 320"/>
+  <path class="edge e-engine" marker-end="url(#ah-en)" d="M615 348 C670 348 690 348 745 348"/>
+  <path class="edge e-interp" marker-end="url(#ah-en)" d="M200 376 C200 402 200 404 200 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-en)" d="M520 376 C520 402 520 404 520 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-en)" d="M840 376 C840 402 840 404 840 430"/>
+  <path class="edge e-interp" marker-end="url(#ah-en)" d="M200 486 C200 512 200 502 200 528"/>
+  <path class="edge e-out" marker-end="url(#ah-en)" d="M200 486 C200 633 520 479 520 626"/>
+  <path class="edge e-out" marker-end="url(#ah-en)" d="M200 584 C200 683 326 654 425 654"/>
+  <path class="edge e-out" marker-end="url(#ah-en)" d="M520 486 C520 545 520 567 520 626"/>
+  <path class="edge e-out" marker-end="url(#ah-en)" d="M840 486 C840 604 733 654 615 654"/>
+  <path class="edge e-out" marker-end="url(#ah-en)" d="M520 682 C520 708 520 686 520 712"/>
+  <g><rect class="node n-sh" x="425" y="24" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="34" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="47" text-anchor="middle">M0</text><text class="nname" x="483" y="48">Input + Platform</text><text class="ntool" x="437" y="69">detect (kısa/uzun)</text><circle class="port-sh" cx="520" cy="24" r="4"/><circle class="port-sh" cx="520" cy="80" r="4"/></g>
+  <g><rect class="node n-sh" x="425" y="110" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="120" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="133" text-anchor="middle">M1</text><text class="nname" x="483" y="134">QC Stats</text><text class="ntool" x="437" y="155">fastp/NanoPlot → 01</text><circle class="port-sh" cx="520" cy="110" r="4"/><circle class="port-sh" cx="520" cy="166" r="4"/></g>
+  <g><rect class="node n-sh" x="425" y="196" width="190" height="56" rx="11"/><rect class="chip-sh" x="435" y="206" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="219" text-anchor="middle">PLAN</text><text class="nname" x="483" y="220">Samplesheet + Plan</text><text class="ntool" x="437" y="241">nf-core planlama</text><circle class="port-sh" cx="520" cy="196" r="4"/><circle class="port-sh" cx="520" cy="252" r="4"/></g>
+  <g><rect class="node n-engine" x="105" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="115" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="343" text-anchor="middle">TAX</text><text class="nname" x="163" y="344">taxprofiler</text><text class="ntool" x="117" y="365">Kraken2·Bracken·sylph</text><circle class="port-engine" cx="200" cy="320" r="4"/><circle class="port-engine" cx="200" cy="376" r="4"/></g>
+  <g><rect class="node n-engine" x="425" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="435" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="343" text-anchor="middle">MAG</text><text class="nname" x="483" y="344">mag</text><text class="ntool" x="437" y="365">metaSPAdes/Flye·SemiBin2·CheckM2</text><circle class="port-engine" cx="520" cy="320" r="4"/><circle class="port-engine" cx="520" cy="376" r="4"/></g>
+  <g><rect class="node n-engine" x="745" y="320" width="190" height="56" rx="11"/><rect class="chip-engine" x="755" y="330" width="40" height="18" rx="5"/><text class="chip-t" x="775" y="343" text-anchor="middle">FUNC</text><text class="nname" x="803" y="344">funcscan</text><text class="ntool" x="757" y="365">AMR + BGC (MAG'larda)</text><circle class="port-engine" cx="840" cy="320" r="4"/><circle class="port-engine" cx="840" cy="376" r="4"/></g>
+  <g><rect class="node n-interp" x="105" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="115" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="453" text-anchor="middle">P02</text><text class="nname" x="163" y="454">02 Taxonomic Profile</text><text class="ntool" x="117" y="475">parse taxprofiler</text><circle class="port-interp" cx="200" cy="430" r="4"/><circle class="port-interp" cx="200" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="425" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="435" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="453" text-anchor="middle">P04</text><text class="nname" x="483" y="454">04 MAG Quality</text><text class="ntool" x="437" y="475">parse mag (CheckM2)</text><circle class="port-interp" cx="520" cy="430" r="4"/><circle class="port-interp" cx="520" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="745" y="430" width="190" height="56" rx="11"/><rect class="chip-interp" x="755" y="440" width="40" height="18" rx="5"/><text class="chip-t" x="775" y="453" text-anchor="middle">P05</text><text class="nname" x="803" y="454">05 AMR / BGC</text><text class="ntool" x="757" y="475">parse funcscan</text><circle class="port-interp" cx="840" cy="430" r="4"/><circle class="port-interp" cx="840" cy="486" r="4"/></g>
+  <g><rect class="node n-interp" x="105" y="528" width="190" height="56" rx="11"/><rect class="chip-interp" x="115" y="538" width="40" height="18" rx="5"/><text class="chip-t" x="135" y="551" text-anchor="middle">STAT</text><text class="nname" x="163" y="552">03 Diversity + Stats</text><text class="ntool" x="117" y="573">α/β · PERMANOVA · dif. bolluk</text><circle class="port-interp" cx="200" cy="528" r="4"/><circle class="port-interp" cx="200" cy="584" r="4"/></g>
+  <g><rect class="node n-out" x="425" y="626" width="190" height="56" rx="11"/><rect class="chip-out" x="435" y="636" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="649" text-anchor="middle">FIG</text><text class="nname" x="483" y="650">06 Figures</text><text class="ntool" x="437" y="671">yayın-kalite PDF</text><circle class="port-out" cx="520" cy="626" r="4"/><circle class="port-out" cx="520" cy="682" r="4"/></g>
+  <g><rect class="node n-out" x="425" y="712" width="190" height="56" rx="11"/><rect class="chip-out" x="435" y="722" width="40" height="18" rx="5"/><text class="chip-t" x="455" y="735" text-anchor="middle">REP</text><text class="nname" x="483" y="736">07 Report</text><text class="ntool" x="437" y="757">Jinja2 → MD → PDF</text><circle class="port-out" cx="520" cy="712" r="4"/><circle class="port-out" cx="520" cy="768" r="4"/></g>
+  <text class="hublbl" x="660" y="250" text-anchor="middle">plan → 3 engines</text>
+</svg>
+    </div>
+    </figure>
+
+    <h2>Module matrix — tools &amp; dependency</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:52px">Code</th><th style="width:170px">Module</th><th style="width:110px">Depends</th><th>Tool &amp; function</th></tr></thead>
+      <tbody>
+        <tr><td class="code">M0</td><td class="mod">Input + Platform <span class="tag sh">SHARED</span></td><td class="dep">—</td><td>detect (kısa/uzun)</td></tr>
+        <tr><td class="code">M1</td><td class="mod">QC Stats <span class="tag sh">SHARED</span></td><td class="dep">M0</td><td>fastp/NanoPlot → 01</td></tr>
+        <tr><td class="code">PLAN</td><td class="mod">Samplesheet + Plan <span class="tag sh">SHARED</span></td><td class="dep">M1</td><td>nf-core planlama</td></tr>
+        <tr><td class="code">TAX</td><td class="mod">taxprofiler <span class="tag engine">NF-CORE ENGINE</span></td><td class="dep">PLAN</td><td>Kraken2·Bracken·sylph</td></tr>
+        <tr><td class="code">MAG</td><td class="mod">mag <span class="tag engine">NF-CORE ENGINE</span></td><td class="dep">PLAN</td><td>metaSPAdes/Flye·SemiBin2·CheckM2</td></tr>
+        <tr><td class="code">FUNC</td><td class="mod">funcscan <span class="tag engine">NF-CORE ENGINE</span></td><td class="dep">MAG</td><td>AMR + BGC (MAG'larda)</td></tr>
+        <tr><td class="code">P02</td><td class="mod">02 Taxonomic Profile <span class="tag interp">INTERPRET</span></td><td class="dep">TAX</td><td>parse taxprofiler</td></tr>
+        <tr><td class="code">P04</td><td class="mod">04 MAG Quality <span class="tag interp">INTERPRET</span></td><td class="dep">MAG</td><td>parse mag (CheckM2)</td></tr>
+        <tr><td class="code">P05</td><td class="mod">05 AMR / BGC <span class="tag interp">INTERPRET</span></td><td class="dep">FUNC</td><td>parse funcscan</td></tr>
+        <tr><td class="code">STAT</td><td class="mod">03 Diversity + Stats <span class="tag interp">INTERPRET</span></td><td class="dep">P02</td><td>α/β · PERMANOVA · dif. bolluk</td></tr>
+        <tr><td class="code">FIG</td><td class="mod">06 Figures <span class="tag out">OUTPUT</span></td><td class="dep">P02–P05 + 03</td><td>yayın-kalite PDF</td></tr>
+        <tr><td class="code">REP</td><td class="mod">07 Report <span class="tag out">OUTPUT</span></td><td class="dep">FIG</td><td>Jinja2 → MD → PDF</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>Isolated conda environments</h2>
+    <div class="envs">
+      <span class="env"><b>nextflow</b> · main</span><span class="env"><b>nf-core/taxprofiler</b></span><span class="env"><b>nf-core/mag</b></span><span class="env"><b>nf-core/funcscan</b></span><span class="env"><b>microbiomeforge</b></span>
+    </div>
+    <footer>MicrobiomeForge · interpreted-report layer on the nf-core engine · github.com/aliarslan47/MicrobiomeForge. Edges are the real output dependencies: funcscan ← mag (MAGs), 03 diversity ← 02 profile. Short: taxprofiler Kraken2/Bracken, mag metaSPAdes; long: taxprofiler sylph, mag metaFlye/metaMDBG.</footer>
+  </div>
+</div>
+
+<script>
+  (function(){
+    var btns = document.querySelectorAll('.langbtn');
+    var pages = document.querySelectorAll('.page');
+    btns.forEach(function(b){
+      b.addEventListener('click', function(){
+        var l = b.getAttribute('data-lang');
+        btns.forEach(function(x){
+          var on = x.getAttribute('data-lang') === l;
+          x.classList.toggle('on', on);
+          x.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        pages.forEach(function(p){ p.hidden = (p.getAttribute('data-lang') !== l); });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

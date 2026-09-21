@@ -32,7 +32,18 @@ platform (kısa/uzun okuma) otomatik tespiti.
   atlanıp rapora+loga not düşülüyor. Platform tespiti (`detect.py`) veriden; tasarım ise
   metadata/bildirim — çünkü tasarım verinin fiziksel özelliği değil. **50/50 test geçiyor.**
 
+## 2026-09-21 — AİLE PIPELINE DAG TAMAM + nf-core feasibility notu
+- **✅ Pipeline DAG üretildi** (family standart, PipelineForge): `PipelineForge/specs/microbiomeforge.yml` →
+  `docs/pipeline_architecture.html` (12 kart/15 kenar, self-validate ✓). Omurga girdi→QC→plan; plandan 3
+  nf-core motoru (taxprofiler·mag·funcscan; **funcscan←mag MAG bağı**); yorum katmanı (P02 profil, 03
+  çeşitlilik+PERMANOVA, 04 MAG-kalite, 05 AMR/BGC) → 06 şekiller → 07 rapor. 4 kategori (ortak/nf-core
+  motoru/yorum/çıktı), çift-dilli TR/EN. **Görsel QA** chrome-headless-shell PNG ile yapıldı (temiz). README'lere
+  DAG linki eklendi. (Pages: repo Settings→Pages→main /docs açılmalı; dosya docs/'ta hazır.)
+- **nf-core feasibility (probe):** Java 11 + Docker daemon OK + 582G disk var → canlı nf-core **prensipte mümkün**.
+  ⚠️ Java 11 son Nextflow için eski olabilir (17+ ister); tam koşu ağır (Nextflow kur + taxprofiler pull +
+  DB/veri indir). Bounded proof-of-life henüz yapılmadı — büyük compute öncesi Ali kararı bekleniyor.
+
 ## Sırada (Ali seçecek)
-- nf-core motor bağlantısının (Nextflow + konteyner) canlı uçtan-uca kurulumu / `docs/` modül planı
-- funcscan AMR/BGC (05) ve mag MAG-kalite (04) modüllerinin gerçek-veri doğrulaması
-- Aile Pipeline DAG şeması (artifact) + PipelineForge spec
+- **nf-core motorunun CANLI uçtan-uca kurulumu** (Nextflow + konteyner): şu ana dek parser/stat/rapor katmanı
+  canlı-OLMAYAN profil verisiyle doğrulandı; motor gerçek çalıştırılmadı. Ağır/uzun iş (bkz feasibility notu).
+- funcscan AMR/BGC (05) ve mag MAG-kalite (04) modüllerinin gerçek-veri doğrulaması (04/05 real_report'ta yoktu).
