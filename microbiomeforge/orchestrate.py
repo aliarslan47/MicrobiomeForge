@@ -42,6 +42,7 @@ def run_analysis(
     min_abundance: float = 0.0,           # bu bağıl bolluğun altındaki taksonlar elenir (ör. 1e-4)
     bracken_threshold: int = 10,          # Bracken -t: taksonun en az okuma sayısı
     memory_mapping: bool = False,
+    host_taxa: tuple[str, ...] = ("Homo sapiens",),  # mikrobiyom profilinden çıkarılır, ayrıca raporlanır
 ) -> dict:
     outdir, workdir = Path(outdir), Path(workdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -101,6 +102,17 @@ def run_analysis(
     # --- 02: Taksonomik profil ---
     per_sample = {name: parsers.parse_bracken(path, name) for name, path in profile_files.items()}
     matrix = parsers.build_abundance_matrix(per_sample)
+    host_fraction = {}
+    if host_taxa and not matrix.empty:
+        is_host = matrix["taxon"].isin(host_taxa)
+        num_cols = [c for c in matrix.columns if c != "taxon"]
+        host_fraction = {c: round(float(matrix.loc[is_host, c].sum()), 6) for c in num_cols}
+        if is_host.any():
+            matrix = matrix[~is_host].reset_index(drop=True)
+            totals = matrix[num_cols].sum(axis=0).replace(0, 1.0)
+            matrix[num_cols] = matrix[num_cols] / totals
+            print(f"[MicrobiomeForge] Konak ({', '.join(host_taxa)}) profilden çıkarıldı; "
+                  f"Bracken payı: {host_fraction}", file=sys.stderr)
     n_taxa_raw = len(matrix)
     if min_abundance > 0:
         matrix = parsers.filter_low_abundance(matrix, min_abundance)
@@ -209,4 +221,5 @@ def run_analysis(
         "n_taxa_raw": n_taxa_raw,
         "n_taxa": len(matrix),
         "classification": classify_rows,
+        "host_fraction": host_fraction,
     }

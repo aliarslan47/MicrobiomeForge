@@ -93,6 +93,12 @@ def classify_sample(
     outdir.mkdir(parents=True, exist_ok=True)
     report = outdir / f"{s.sample}.k2report"
     bracken = outdir / f"{s.sample}.bracken"
+    done = outdir / f"{s.sample}.done"
+    read_len = pick_read_len(mean_len, available_read_lengths(db))
+    if done.exists() and report.exists() and bracken.exists():
+        # Devam: bu örnek aynı çalışma dizininde daha önce tamamlanmış.
+        print(f"[MicrobiomeForge] {s.sample}: önceki Kraken2/Bracken sonucu kullanılıyor", file=sys.stderr)
+        return ClassifyResult(s.sample, bracken, report, read_len, _classified_pct(report))
 
     cmd = ["kraken2", "--db", str(db), "--threads", str(threads),
            "--report", str(report), "--output", "-"]
@@ -107,11 +113,11 @@ def classify_sample(
     print(f"[MicrobiomeForge] Kraken2: {s.sample}", file=sys.stderr)
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-    read_len = pick_read_len(mean_len, available_read_lengths(db))
     bcmd = ["bracken", "-d", str(db), "-i", str(report), "-o", str(bracken),
             "-w", str(outdir / f"{s.sample}.bracken_report"),
             "-r", str(read_len), "-l", level, "-t", str(bracken_threshold)]
     print(f"[MicrobiomeForge] Bracken: {s.sample} (r={read_len}, l={level}, t={bracken_threshold})",
           file=sys.stderr)
     subprocess.run(bcmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    done.write_text(f"db={db}\nread_len={read_len}\n")
     return ClassifyResult(s.sample, bracken, report, read_len, _classified_pct(report))

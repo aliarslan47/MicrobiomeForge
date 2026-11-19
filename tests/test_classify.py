@@ -61,3 +61,19 @@ def test_single_sample_run(tmp_path):
                                category="short")],
                        {"s1": str(prof)}, tmp_path / "out", tmp_path / "work")
     assert res["design"] == "single" and res["n_taxa"] == 2
+
+
+def test_host_removed_from_profile(tmp_path):
+    from microbiomeforge.orchestrate import run_analysis
+    from microbiomeforge.pipelines import Sample
+    prof = tmp_path / "s1.bracken"
+    prof.write_text("name\tfraction_total_reads\nA\t0.5\nB\t0.4\nHomo sapiens\t0.1\n")
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("".join(f"@r{i}\nACGTACGTAC\n+\nIIIIIIIIII\n" for i in range(5)))
+    res = run_analysis([Sample("s1", "gaita", fastq_1=str(fq), platform="illumina",
+                               category="short")],
+                       {"s1": str(prof)}, tmp_path / "out", tmp_path / "work")
+    assert res["host_fraction"] == {"s1": 0.1}
+    prof_out = pd.read_csv(tmp_path / "out" / "02_taxonomic_profile.tsv", sep="\t")
+    assert "Homo sapiens" not in set(prof_out["taxon"])
+    assert abs(prof_out["s1"].sum() - 1.0) < 1e-9
