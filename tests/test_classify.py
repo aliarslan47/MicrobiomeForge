@@ -45,3 +45,19 @@ def test_filter_keeps_taxon_abundant_in_one_sample():
 def test_filter_off():
     m = pd.DataFrame({"taxon": ["A"], "s1": [1.0]})
     assert parsers.filter_low_abundance(m, 0).equals(m)
+
+
+def test_single_sample_run(tmp_path):
+    """Tek örnek: PCoA atlanır, rapor yine üretilir."""
+    from microbiomeforge.orchestrate import run_analysis
+    from microbiomeforge.pipelines import Sample
+    prof = tmp_path / "s1.bracken"
+    prof.write_text("name\ttaxonomy_id\ttaxonomy_lvl\tkraken_assigned_reads\tadded_reads\t"
+                    "new_est_reads\tfraction_total_reads\n"
+                    "A\t1\tS\t60\t0\t60\t0.6\nB\t2\tS\t40\t0\t40\t0.4\n")
+    fq = tmp_path / "s1.fastq"
+    fq.write_text("".join(f"@r{i}\nACGTACGTAC\n+\nIIIIIIIIII\n" for i in range(5)))
+    res = run_analysis([Sample("s1", "gaita", fastq_1=str(fq), platform="illumina",
+                               category="short")],
+                       {"s1": str(prof)}, tmp_path / "out", tmp_path / "work")
+    assert res["design"] == "single" and res["n_taxa"] == 2

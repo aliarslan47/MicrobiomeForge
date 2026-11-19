@@ -114,8 +114,10 @@ def run_analysis(
     # --- 03: Çeşitlilik (+ tasarım karşılaştırmalıysa grup testleri) ---
     alpha = stats.alpha_diversity(matrix)
     write_table(alpha, outdir, "diversity_stats")
+    n_profiled = len([c for c in matrix.columns if c != "taxon"])
     D = stats.bray_curtis_matrix(matrix)
-    coords = stats.pcoa(D)
+    # Beta çeşitlilik ordinasyonu en az 3 örnekle anlamlı; 1-2 örnekte atlanır.
+    coords = stats.pcoa(D) if n_profiled >= 3 else None
     if dspec.kind == "comparative":
         at = stats.compare_alpha(alpha, groups, metric="shannon")
         perm = stats.permanova(D, groups)
@@ -143,7 +145,8 @@ def run_analysis(
     fi["raw_qc"] = figs.raw_qc(qc_df)
     fi["abundance"] = figs.abundance_bar(matrix)
     fi["alpha"] = figs.alpha_box(alpha, groups)
-    fi["pcoa"] = figs.pcoa_scatter(coords, groups)
+    if coords is not None:
+        fi["pcoa"] = figs.pcoa_scatter(coords, groups)
     if dspec.kind == "comparative" and not diff.empty:
         fi["volcano"] = figs.volcano(diff)
     if mag_df is not None and not mag_df.empty:
@@ -170,7 +173,9 @@ def run_analysis(
         alpha_text = ("Tekli/betimsel tasarım: alfa çeşitliliği örnekler için betimsel "
                       "olarak raporlandı; gruplar arası karşılaştırma yapılmadı.")
         beta_text = ("Betimsel beta-çeşitlilik (Bray-Curtis + PCoA) sunuldu; "
-                     "PERMANOVA gibi grup-ayrım testleri uygulanmadı.")
+                     "PERMANOVA gibi grup-ayrım testleri uygulanmadı." if coords is not None else
+                     f"Beta-çeşitlilik ordinasyonu {n_profiled} örnekle anlamlı olmadığından "
+                     "uygulanmadı (en az 3 örnek gerekir).")
         diff_text = "Diferansiyel bolluk testi tekli tasarımda uygulanmadı."
 
     # --- 07: Rapor ---
