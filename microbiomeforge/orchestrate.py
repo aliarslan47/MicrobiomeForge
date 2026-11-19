@@ -37,6 +37,11 @@ def run_analysis(
     amr_file: Optional[str] = None,
     project: str = "MicrobiomeForge",
     design: Optional[DesignKind] = None,  # None=metadata'dan çıkar; "single"|"comparative"=açık bildirim
+    kraken_db: Optional[str] = None,      # verilirse yerel motor: FASTQ → Kraken2 → Bracken
+    threads: int = 8,
+    min_abundance: float = 0.0,           # bu bağıl bolluğun altındaki taksonlar elenir (ör. 1e-4)
+    bracken_threshold: int = 10,          # Bracken -t: taksonun en az okuma sayısı
+    memory_mapping: bool = False,
 ) -> dict:
     outdir, workdir = Path(outdir), Path(workdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -50,25 +55,60 @@ def run_analysis(
     # Kararı gürültülü şekilde bildir (sessiz varsayım yok).
     print(f"[MicrobiomeForge] Tasarım: {dspec.kind} — {dspec.note}", file=sys.stderr)
 
-    # nf-core plan → hangi araçlar kullanıldı (kaynakça).
-    plan_pipelines(samples, registry)
+    # Kaynakçaya YALNIZ fiilen çalışan araçlar girer.
+    # Yerel motorda nf-core planı işlenmez; nf-core modunda plan (mevcut davranış).
+    if kraken_db is None:
+        plan_pipelines(samples, registry)
 
     # --- 01: Ham QC (istatistik zincirinin başı) ---
     qc_stats_list = []
     for s in samples:
         target = s.long_reads or s.fastq_1
         if target and Path(target).exists():
-            registry.mark_used("seqkit")
             cat = s.category or "short"
-            registry.mark_used("nanoplot" if cat == "long" else "fastp")
+            # QC istatistikleri Python içinde hesaplanır; seqkit/fastp/NanoPlot çalışmaz.
+            # nf-core modunda bu araçlar plan üzerinden zaten kaynakçaya girer.
             qc_stats_list.append(compute_raw_stats(target, s.sample, cat, stage="raw"))
     qc_df = qc_table(qc_stats_list)
     write_table(qc_df, outdir, "raw_qc")
     delta_df = qc_delta(qc_df) if "stage" in qc_df and (qc_df["stage"] == "trimmed").any() else None
 
+    # --- 02a: Yerel sınıflandırma (FASTQ → Kraken2 → Bracken) ---
+    classify_rows = []
+    if kraken_db is not None:
+        from . import classify
+        classify.check_tools()
+        db = Path(kraken_db)
+        # Bracken dağılımı için ortanca uzunluk (kırpılmış birkaç kısa okuma ortalamayı düşürür).
+        mean_len = {st.sample: st.median_length for st in qc_stats_list}
+        profile_files = dict(profile_files or {})
+        for s in samples:
+            if s.sample in profile_files or not s.has_reads():
+                continue
+            r = classify.classify_sample(
+                s, db, workdir / "kraken2", mean_len.get(s.sample, 150.0), threads=threads,
+                bracken_threshold=bracken_threshold, memory_mapping=memory_mapping,
+            )
+            profile_files[s.sample] = str(r.bracken)
+            classify_rows.append({"sample": r.sample, "classified_pct": r.classified_pct,
+                                  "bracken_read_len": r.read_len})
+        registry.mark_used("kraken2", classify.tool_version("kraken2"))
+        registry.mark_used("bracken", classify.tool_version("bracken"))
+        for row in classify_rows:
+            print(f"[MicrobiomeForge] {row['sample']}: sınıflanan okuma %{row['classified_pct']}",
+                  file=sys.stderr)
+
     # --- 02: Taksonomik profil ---
     per_sample = {name: parsers.parse_bracken(path, name) for name, path in profile_files.items()}
     matrix = parsers.build_abundance_matrix(per_sample)
+    n_taxa_raw = len(matrix)
+    if min_abundance > 0:
+        matrix = parsers.filter_low_abundance(matrix, min_abundance)
+        print(f"[MicrobiomeForge] Düşük bolluk filtresi (<{min_abundance:g}): "
+              f"{n_taxa_raw} → {len(matrix)} takson", file=sys.stderr)
+    if not matrix.empty:  # en bol takson üstte
+        _num = matrix.select_dtypes("number")
+        matrix = matrix.loc[_num.mean(axis=1).sort_values(ascending=False).index].reset_index(drop=True)
     write_table(matrix, outdir, "taxonomic_profile")
 
     # --- 03: Çeşitlilik (+ tasarım karşılaştırmalıysa grup testleri) ---
@@ -161,4 +201,7 @@ def run_analysis(
         "n_significant_taxa": n_sig,
         "report": report_out,
         "n_references": len(registry.bibliography()),
+        "n_taxa_raw": n_taxa_raw,
+        "n_taxa": len(matrix),
+        "classification": classify_rows,
     }

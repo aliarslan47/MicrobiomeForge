@@ -54,6 +54,22 @@ def build_abundance_matrix(per_sample: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return matrix.reset_index()
 
 
+def filter_low_abundance(matrix: pd.DataFrame, min_abundance: float) -> pd.DataFrame:
+    """Hiçbir örnekte `min_abundance` bağıl bolluğa ulaşmayan taksonları eler,
+    sonra her örneği yeniden 1'e normalize eder.
+
+    Kraken2'nin çok düşük oranlı yanlış-pozitif çağrılarını ayıklamak içindir.
+    """
+    if matrix.empty or min_abundance <= 0:
+        return matrix
+    m = matrix.set_index("taxon")
+    keep = m.max(axis=1) >= min_abundance
+    m = m[keep]
+    totals = m.sum(axis=0).replace(0, 1.0)
+    m = m / totals
+    return m.reset_index()
+
+
 def parse_checkm2(path: str | Path) -> pd.DataFrame:
     """CheckM2 quality_report.tsv → [bin, completeness, contamination, quality]."""
     df = pd.read_csv(path, sep="\t")

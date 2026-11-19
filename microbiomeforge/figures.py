@@ -113,7 +113,7 @@ class Figures:
         order = list(dict.fromkeys(df["group"]))
         data = [df[df["group"] == g][metric].to_numpy() for g in order]
         fig, ax = plt.subplots(figsize=(5, 4))
-        ax.boxplot(data, labels=order, showmeans=True)
+        ax.boxplot(data, tick_labels=order, showmeans=True)
         ax.set_ylabel(metric.capitalize())
         ax.set_xlabel("Grup")
         return self._save(fig, title or f"Alfa çeşitlilik ({metric}) grup karşılaştırması")

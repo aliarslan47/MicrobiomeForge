@@ -118,7 +118,7 @@ def render_markdown(ctx: ReportContext) -> str:
         "table_raw_qc": tn.caption("Ham okuma istatistiği (örnek başına)", ctx.qc_df),
         "table_qc_delta": tn.caption("Trim öncesi→sonrası tutulma oranı", ctx.qc_delta_df)
             if ctx.qc_delta_df is not None and not ctx.qc_delta_df.empty else "",
-        "table_top_taxa": tn.caption("En bol taksonlar (bağıl bolluk)", ctx.top_taxa, max_rows=15),
+        "table_top_taxa": tn.caption("En bol taksonlar (bağıl bolluk)", _sort_by_mean(ctx.top_taxa), max_rows=15),
         "alpha_narrative": ctx.alpha_test_text,
         "table_alpha": tn.caption("Örnek başına alfa çeşitlilik", ctx.alpha_df),
         "beta_narrative": ctx.beta_test_text,
@@ -141,24 +141,52 @@ def render_markdown(ctx: ReportContext) -> str:
     return tpl.render(**data)
 
 
+_DISPLAY = {
+    "fastp": "fastp", "seqkit": "SeqKit", "nanoplot": "NanoPlot", "nanoplot2": "NanoPlot",
+    "kraken2": "Kraken2", "bracken": "Bracken", "sylph": "sylph", "metaphlan4": "MetaPhlAn 4",
+    "metamdbg": "metaMDBG", "semibin2": "SemiBin2", "checkm2": "CheckM2", "ancombc": "ANCOM-BC",
+    "nfcore_taxprofiler": "nf-core/taxprofiler", "nfcore_mag": "nf-core/mag",
+}
+
+
+def _sort_by_mean(m: pd.DataFrame) -> pd.DataFrame:
+    """Taksonları örnekler arası ortalama bağıl bolluğa göre azalan sıralar."""
+    if m is None or m.empty:
+        return m
+    num = m.select_dtypes("number")
+    return m.loc[num.mean(axis=1).sort_values(ascending=False).index].reset_index(drop=True)
+
+
 def _default_methods(ctx: ReportContext) -> str:
-    tools = ", ".join(r.name.split(":")[0].split(" ")[0] for r in ctx.registry.bibliography())
+    refs = ctx.registry.bibliography()
+    names = []
+    for r in refs:
+        v = ctx.registry.version_of(r.key)
+        names.append(_DISPLAY.get(r.key, r.key) + (f" v{v}" if v else ""))
+    tools = ", ".join(names)
+    nfcore = any(r.key.startswith("nfcore") for r in refs)
+    engine = ("nf-core pipeline'larıyla yürütüldü" if nfcore else
+              "Kraken2 ile okuma düzeyinde sınıflandırma ve Bracken ile tür düzeyinde "
+              "bolluk tahmini olarak yerelde yürütüldü")
     return (
         "Ham okumalar platform (kısa/uzun) açısından otomatik sınıflandırıldı; kalite "
-        "istatistikleri okuma düzeyinden hesaplandı. Taksonomik profilleme ve derleme "
-        f"nf-core pipeline'larıyla yürütüldü. Kullanılan araçlar: {tools}. Alfa/beta "
+        "istatistikleri okuma düzeyinden hesaplandı. Taksonomik profilleme "
+        f"{engine}. Kullanılan araçlar: {tools}. Alfa/beta "
         "çeşitlilik, PERMANOVA ve CLR-tabanlı diferansiyel bolluk (BH-FDR) analizleri "
         "uygulandı."
     )
 
 
 def markdown_to_pdf(md_path: Path, pdf_path: Path) -> bool:
-    """pandoc + xelatex ile PDF üretir. pandoc yoksa False döner (MD kalır)."""
+    """pandoc + xelatex (yoksa tectonic) ile PDF üretir. pandoc/motor yoksa False (MD kalır)."""
     if shutil.which("pandoc") is None:
+        return False
+    engine = next((e for e in ("xelatex", "tectonic") if shutil.which(e)), None)
+    if engine is None:
         return False
     cmd = [
         "pandoc", str(md_path), "-o", str(pdf_path),
-        "--pdf-engine=xelatex", "-V", "geometry:margin=2cm",
+        f"--pdf-engine={engine}", "-V", "geometry:margin=2cm",
     ]
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=300)

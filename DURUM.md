@@ -43,6 +43,21 @@ platform (kısa/uzun okuma) otomatik tespiti.
   ⚠️ Java 11 son Nextflow için eski olabilir (17+ ister); tam koşu ağır (Nextflow kur + taxprofiler pull +
   DB/veri indir). Bounded proof-of-life henüz yapılmadı — büyük compute öncesi Ali kararı bekleniyor.
 
+## 2026-11-19 — YEREL MOTOR (nf-core'suz) ÇALIŞIYOR
+- Bu makinede Java/Nextflow/Docker yok, WSL RAM 15 GB → nf-core yerine **yerel motor** eklendi:
+  `microbiomeforge run --samplesheet s.csv --kraken-db <DB> --outdir out/ [--threads N]`
+  (`classify.py`: FASTQ → Kraken2 → Bracken; Bracken okuma uzunluğu ortanca uzunluktan, DB'deki
+  k-mer dağılımlarından seçilir). `--profiles-dir` artık isteğe bağlı (nf-core çıktısı için duruyor).
+- **Düşük bolluk filtresi** `--min-abundance` (varsayılan 1e-4): hiçbir örnekte eşiğe ulaşmayan takson
+  elenir, örnekler yeniden 1'e normalize edilir (Kraken2 yanlış-pozitiflerine karşı). `--bracken-threshold`, `--memory-mapping`.
+- Düzeltmeler: boxplot `tick_labels` (matplotlib ≥3.9), PDF motoru xelatex yoksa tectonic, kaynakçaya
+  çalışmayan araç (seqkit/fastp/NanoPlot) yazılmıyor, Yöntemler metni motoru doğru söylüyor,
+  taksonlar ortalama bolluğa göre sıralı (tablo + 02 TSV).
+- Conda ortamı: `microbiomeforge` (environment.yml güncellendi). **56/56 test geçiyor.**
+- Doğrulama: PRJNA827663 (ENA, md5 OK) 6 Illumina (Gün1×3 / Gün30×3) karşılaştırmalı + 2 ONT tekli,
+  uçtan uca PDF; ~40 sn/koşu, ~8 GB RAM (8 GB DB).
+- Bilinen kozmetik: Tablo 1 sütun başlıkları üst üste biniyor; şekillerde "Figure N:" + "Şekil N." çift başlık.
+
 ## Sırada (Ali seçecek)
 - **nf-core motorunun CANLI uçtan-uca kurulumu** (Nextflow + konteyner): şu ana dek parser/stat/rapor katmanı
   canlı-OLMAYAN profil verisiyle doğrulandı; motor gerçek çalıştırılmadı. Ağır/uzun iş (bkz feasibility notu).

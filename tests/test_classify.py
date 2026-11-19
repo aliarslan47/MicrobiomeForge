@@ -1,0 +1,47 @@
+import pandas as pd
+import pytest
+
+from microbiomeforge import classify, parsers
+
+
+def test_pick_read_len():
+    avail = [50, 75, 100, 150, 200, 250, 300]
+    assert classify.pick_read_len(151, avail) == 150
+    assert classify.pick_read_len(149.5, avail) == 100
+    assert classify.pick_read_len(30, avail) == 50
+    assert classify.pick_read_len(4500, avail) == 300
+    with pytest.raises(ValueError):
+        classify.pick_read_len(150, [])
+
+
+def test_available_read_lengths(tmp_path):
+    for n in (100, 150, 75):
+        (tmp_path / f"database{n}mers.kmer_distrib").write_text("")
+    (tmp_path / "hash.k2d").write_text("")
+    assert classify.available_read_lengths(tmp_path) == [75, 100, 150]
+
+
+def test_classified_pct(tmp_path):
+    rep = tmp_path / "x.k2report"
+    rep.write_text("12.50\t125\t125\tU\t0\tunclassified\n87.50\t875\t0\tR\t1\troot\n")
+    assert classify._classified_pct(rep) == 87.5
+
+
+def test_filter_low_abundance_drops_and_renormalizes():
+    m = pd.DataFrame({"taxon": ["A", "B", "noise"],
+                      "s1": [0.6, 0.39995, 0.00005],
+                      "s2": [0.5, 0.49995, 0.00005]})
+    out = parsers.filter_low_abundance(m, 1e-4)
+    assert list(out["taxon"]) == ["A", "B"]
+    assert out[["s1", "s2"]].sum().round(9).tolist() == [1.0, 1.0]
+
+
+def test_filter_keeps_taxon_abundant_in_one_sample():
+    m = pd.DataFrame({"taxon": ["A", "rare_here"], "s1": [1.0, 0.0], "s2": [0.9, 0.1]})
+    out = parsers.filter_low_abundance(m, 1e-4)
+    assert "rare_here" in set(out["taxon"])
+
+
+def test_filter_off():
+    m = pd.DataFrame({"taxon": ["A"], "s1": [1.0]})
+    assert parsers.filter_low_abundance(m, 0).equals(m)
