@@ -86,3 +86,8 @@ def test_filter_per_group_keeps_small_groups():
     assert len(parsers.filter_low_abundance(m, 1e-4)) == 2
     out = parsers.filter_low_abundance(m, 1e-4, groups=groups)
     assert set(out["taxon"]) == {"B1", "B2", "V1", "V2"}
+    # grup içi seyrek gürültü elenir
+    m2 = pd.DataFrame({"taxon": ["B1", "V1", "Vnoise"], "s": [0.9999, 0.0000999, 0.0000001]})
+    g2 = {"B1": "Bakteri", "V1": "Virüs", "Vnoise": "Virüs"}
+    out2 = parsers.filter_low_abundance(m2, 1e-4, groups=g2, min_group_abundance=0.005)
+    assert set(out2["taxon"]) == {"B1", "V1"}

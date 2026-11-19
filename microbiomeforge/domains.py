@@ -121,11 +121,20 @@ def db_has_fungi(db: str | Path, min_minimizers: int = 1_000_000) -> bool | None
     return False
 
 
-def category_note(category: str, sub: pd.DataFrame, fungi_in_db: bool | None) -> str:
+LOW_SIGNAL_PCT = 0.01   # toplam okumanın %0,01'inden az → güvenilir değil
+
+
+def category_note(category: str, sub: pd.DataFrame, fungi_in_db: bool | None,
+                  group_pct: float | None = None) -> str:
     n = len(sub)
     if category in ("Mantar", "Diğer ökaryot") and fungi_in_db is False:
         return ("Kullanılan veritabanı mantar/protozoa genomlarını içermiyor; bu grup bu "
                 "analizle değerlendirilemez (saptanmaması yokluk anlamına gelmez).")
     if n == 0:
         return "Bu grupta filtre eşiğini geçen tür saptanmadı."
-    return f"Bu grupta {n} tür saptandı; oranlar grup içi bağıl bolluktur (grup toplamı = %100)."
+    note = f"Bu grupta {n} tür saptandı; oranlar grup içi bağıl bolluktur (grup toplamı = %100)."
+    if group_pct is not None and group_pct < LOW_SIGNAL_PCT:
+        note = (f"**Düşük sinyal:** bu grup toplam okumanın yalnız %{group_pct:.4f}'i. Okumalar çok "
+                f"sayıda ilgisiz türe birkaçar düzine dağılmış; bu desen büyük olasılıkla "
+                f"yanlış-pozitif/gürültüdür ve grubun anlamlı varlığına kanıt sayılmamalıdır. " + note)
+    return note

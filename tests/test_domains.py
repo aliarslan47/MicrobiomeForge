@@ -45,3 +45,19 @@ def test_within_category_renormalizes():
 def test_fungi_note_when_db_lacks_fungi():
     note = domains.category_note("Mantar", pd.DataFrame(), fungi_in_db=False)
     assert "içermiyor" in note
+
+
+def test_low_signal_warning():
+    sub = pd.DataFrame({"taxon": ["f1"], "s": [1.0]})
+    assert "Düşük sinyal" in domains.category_note("Mantar", sub, True, group_pct=0.003)
+    assert "Düşük sinyal" not in domains.category_note("Bakteri", sub, True, group_pct=66.0)
+
+
+def test_parse_bracken_uses_counts_not_rounded_fraction(tmp_path):
+    from microbiomeforge import parsers
+    p = tmp_path / "x.bracken"
+    p.write_text("name\ttaxonomy_id\ttaxonomy_lvl\tkraken_assigned_reads\tadded_reads\t"
+                 "new_est_reads\tfraction_total_reads\n"
+                 "Big\t1\tS\t999950\t0\t999950\t0.99995\nRare\t2\tS\t50\t0\t50\t0.00000\n")
+    df = parsers.parse_bracken(p, "s")
+    assert df.set_index("taxon").loc["Rare", "abundance"] > 0

@@ -82,6 +82,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             kraken_db=args.kraken_db,
             threads=args.threads,
             min_abundance=args.min_abundance,
+            min_group_abundance=args.min_group_abundance,
             bracken_threshold=args.bracken_threshold,
             memory_mapping=args.memory_mapping,
         )
@@ -111,6 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--threads", type=int, default=8)
     r.add_argument("--min-abundance", type=float, default=0.0001,
                    help="Hiçbir örnekte bu bağıl bolluğa ulaşmayan taksonları ele (varsayılan 0.0001 = %%0,01; 0=kapalı)")
+    r.add_argument("--min-group-abundance", type=float, default=0.005,
+                   help="Grup içi eşik: kendi grubunda (arke, virüs...) bu payı geçen tür tutulur (varsayılan 0.005)")
     r.add_argument("--bracken-threshold", type=int, default=10,
                    help="Bracken -t: taksonun tahmine girmesi için en az okuma (varsayılan 10)")
     r.add_argument("--memory-mapping", action="store_true",

@@ -26,7 +26,8 @@ def parse_bracken(path: str | Path, sample: str) -> pd.DataFrame:
     """
     df = pd.read_csv(path, sep="\t")
     name_col = _first_present(df, ["name", "taxon", "clade_name"])
-    frac_col = _first_present(df, ["fraction_total_reads", "new_est_reads", "abundance", "relative_abundance"])
+    # Okuma sayısı önce: Bracken fraction_total_reads 5 basamağa yuvarlanır, nadir türler 0 olur.
+    frac_col = _first_present(df, ["new_est_reads", "fraction_total_reads", "abundance", "relative_abundance"])
     if name_col is None or frac_col is None:
         raise ValueError(f"{path}: Bracken benzeri sütunlar bulunamadı (name/fraction).")
     out = df[[name_col, frac_col]].copy()
@@ -55,13 +56,15 @@ def build_abundance_matrix(per_sample: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def filter_low_abundance(matrix: pd.DataFrame, min_abundance: float,
-                         groups: dict[str, str] | None = None) -> pd.DataFrame:
+                         groups: dict[str, str] | None = None,
+                         min_group_abundance: float = 0.005) -> pd.DataFrame:
     """Hiçbir örnekte `min_abundance` bağıl bolluğa ulaşmayan taksonları eler,
     sonra her örneği yeniden 1'e normalize eder.
 
-    `groups` (takson → biyolojik grup) verilirse eşik her grubun KENDİ toplamına göre
-    uygulanır; böylece küçük gruplar (arke, virüs) bakteri baskınlığı yüzünden
-    topluca elenmez. Kraken2'nin çok düşük oranlı yanlış-pozitiflerini ayıklamak içindir.
+    `groups` (takson → biyolojik grup) verilirse bir takson, tüm profilde `min_abundance`
+    VEYA kendi grubu içinde `min_group_abundance` eşiğini geçtiğinde tutulur; böylece
+    küçük gruplar (arke, virüs) bakteri baskınlığı yüzünden topluca elenmez, ama grup
+    içindeki seyrek gürültü de girmez. Kraken2'nin çok düşük oranlı yanlış-pozitiflerini ayıklamak içindir.
     """
     if matrix.empty or min_abundance <= 0:
         return matrix
@@ -69,7 +72,7 @@ def filter_low_abundance(matrix: pd.DataFrame, min_abundance: float,
     if groups:
         g = pd.Series([groups.get(t, "?") for t in m.index], index=m.index)
         rel = m.groupby(g).transform(lambda col: col / (col.sum() or 1.0))
-        keep = rel.max(axis=1) >= min_abundance
+        keep = (m.max(axis=1) >= min_abundance) | (rel.max(axis=1) >= min_group_abundance)
     else:
         keep = m.max(axis=1) >= min_abundance
     m = m[keep]

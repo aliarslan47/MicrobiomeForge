@@ -37,7 +37,8 @@ def _find_k2report(profile: Path, sample: str) -> Optional[Path]:
     return None
 
 
-def _db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_raw, n_kept) -> str:
+def _db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_raw, n_kept,
+             min_group_abundance=0.005, low_groups=()) -> str:
     parts = []
     if kraken_db:
         parts.append(f"Kraken2 veritabanı: `{Path(kraken_db).name}`.")
@@ -47,9 +48,13 @@ def _db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_raw, n_ke
         hf = ", ".join(f"{k} %{v * 100:.3f}" for k, v in host_fraction.items())
         parts.append(f"Konak (insan) okumaları mikrobiyom profilinden çıkarıldı (Bracken payı: {hf}).")
     if min_abundance > 0:
-        parts.append(f"Kendi grubu (bakteri, arke, virüs...) içinde hiçbir örnekte "
-                     f"%{min_abundance * 100:g} bağıl bolluğa ulaşmayan türler gürültü olarak "
-                     f"elendi ({n_raw} → {n_kept} tür).")
+        parts.append(f"Tüm profilde %{min_abundance * 100:g} veya kendi grubu içinde "
+                     f"%{min_group_abundance * 100:g} bağıl bolluğa hiçbir örnekte ulaşmayan türler "
+                     f"gürültü olarak elendi ({n_raw} → {n_kept} tür).")
+    if low_groups:
+        parts.append(f"Toplam okumanın %{domains.LOW_SIGNAL_PCT:g}'inden azını oluşturan gruplar "
+                     f"({', '.join(low_groups)}) düşük sinyal olarak işaretlendi ve çeşitlilik "
+                     f"hesaplarına katılmadı.")
     return " ".join(parts)
 
 
@@ -67,7 +72,8 @@ def run_analysis(
     min_abundance: float = 0.0,           # bu bağıl bolluğun altındaki taksonlar elenir (ör. 1e-4)
     bracken_threshold: int = 10,          # Bracken -t: taksonun en az okuma sayısı
     memory_mapping: bool = False,
-    host_taxa: tuple[str, ...] = ("Homo sapiens",),  # mikrobiyom profilinden çıkarılır, ayrıca raporlanır
+    host_taxa: tuple[str, ...] = ("Homo sapiens",),
+    min_group_abundance: float = 0.005,   # grup içi eşik (küçük gruplar için)  # mikrobiyom profilinden çıkarılır, ayrıca raporlanır
 ) -> dict:
     outdir, workdir = Path(outdir), Path(workdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -156,7 +162,8 @@ def run_analysis(
                   f"Bracken payı: {host_fraction}", file=sys.stderr)
     n_taxa_raw = len(matrix)
     if min_abundance > 0:
-        matrix = parsers.filter_low_abundance(matrix, min_abundance, groups=taxon_cat or None)
+        matrix = parsers.filter_low_abundance(matrix, min_abundance, groups=taxon_cat or None,
+                                              min_group_abundance=min_group_abundance)
         print(f"[MicrobiomeForge] Düşük bolluk filtresi (<{min_abundance:g}): "
               f"{n_taxa_raw} → {len(matrix)} takson", file=sys.stderr)
     if not matrix.empty:  # en bol takson üstte
@@ -168,6 +175,21 @@ def run_analysis(
         write_table(_out, outdir, "taxonomic_profile")
     else:
         write_table(matrix, outdir, "taxonomic_profile")
+
+    # Düşük sinyalli gruplar (toplam okumanın %0,01'inden azı) ayrı bölümde uyarıyla
+    # gösterilir ama çeşitlilik/istatistiğe katılmaz (gürültü zenginliği şişirmesin).
+    low_groups = []
+    if domain_df is not None:
+        low_groups = [c for c in domains.MICROBIAL
+                      if c in domain_df and 0 < domain_df[c].mean() < domains.LOW_SIGNAL_PCT]
+    full_matrix = matrix
+    if low_groups and taxon_cat:
+        keep = ~matrix["taxon"].map(lambda t: taxon_cat.get(t) in low_groups)
+        matrix = matrix[keep].reset_index(drop=True)
+        _nc = [c for c in matrix.columns if c != "taxon"]
+        matrix[_nc] = matrix[_nc] / matrix[_nc].sum(axis=0).replace(0, 1.0)
+        print(f"[MicrobiomeForge] Düşük sinyalli gruplar çeşitliliğe katılmadı: {low_groups}",
+              file=sys.stderr)
 
     # --- 03: Çeşitlilik (+ tasarım karşılaştırmalıysa grup testleri) ---
     alpha = stats.alpha_diversity(matrix)
@@ -205,13 +227,15 @@ def run_analysis(
     if taxon_cat:
         fungi_in_db = domains.db_has_fungi(kraken_db) if kraken_db else None
         for cat in domains.MICROBIAL:
-            sub = domains.within_category(matrix, taxon_cat, cat)
+            sub = domains.within_category(full_matrix, taxon_cat, cat)
             fig_no = None
             if not sub.empty:
                 fig_no = figs.abundance_bar(sub, title=f"{cat}: en bol türler (grup içi bağıl bolluk)")
             category_sections.append({
                 "category": cat, "df": sub, "fig": fig_no,
-                "note": domains.category_note(cat, sub, fungi_in_db),
+                "note": domains.category_note(
+                    cat, sub, fungi_in_db,
+                    float(domain_df[cat].mean()) if domain_df is not None and cat in domain_df else None),
             })
     else:
         fi["abundance"] = figs.abundance_bar(matrix)
@@ -267,7 +291,8 @@ def run_analysis(
         fig_index=fi,
         domain_df=domain_df,
         category_sections=category_sections,
-        db_text=_db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_taxa_raw, len(matrix)),
+        db_text=_db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_taxa_raw,
+                         len(full_matrix), min_group_abundance, low_groups),
     )
     report_out = report.generate(ctx, outdir, workdir)
 
@@ -281,7 +306,7 @@ def run_analysis(
         "report": report_out,
         "n_references": len(registry.bibliography()),
         "n_taxa_raw": n_taxa_raw,
-        "n_taxa": len(matrix),
+        "n_taxa": len(full_matrix),
         "classification": classify_rows,
         "host_fraction": host_fraction,
     }
