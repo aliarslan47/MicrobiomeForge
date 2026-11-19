@@ -19,7 +19,7 @@ Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
 
 {{ table_raw_qc }}
 
-{% if fig_raw_qc %}![{{ fig_raw_qc.title }}]({{ fig_raw_qc.png_path }})
+{% if fig_raw_qc %}![]({{ fig_raw_qc.png_path }})
 
 *Şekil {{ fig_raw_qc.number }}. {{ fig_raw_qc.title }}.*{% endif %}
 
@@ -29,11 +29,31 @@ Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
 
 ## 3. Taksonomik profil
 
-{{ table_top_taxa }}
+{{ db_text }}
 
-{% if fig_abundance %}![{{ fig_abundance.title }}]({{ fig_abundance.png_path }})
+{% if table_domains %}{{ table_domains }}
+
+{% endif %}
+{% for sec in category_sections %}
+### 3.{{ loop.index }} {{ sec.title }}
+
+{{ sec.note }}
+
+{% if sec.table %}{{ sec.table }}
+
+{% endif %}
+{% if sec.fig %}![]({{ sec.fig.png_path }})
+
+*Şekil {{ sec.fig.number }}. {{ sec.fig.title }}.*
+
+{% endif %}
+{% endfor %}
+{% if table_top_taxa %}{{ table_top_taxa }}
+
+{% if fig_abundance %}![]({{ fig_abundance.png_path }})
 
 *Şekil {{ fig_abundance.number }}. {{ fig_abundance.title }}.*{% endif %}
+{% endif %}
 
 ---
 
@@ -43,13 +63,13 @@ Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
 
 {{ table_alpha }}
 
-{% if fig_alpha %}![{{ fig_alpha.title }}]({{ fig_alpha.png_path }})
+{% if fig_alpha %}![]({{ fig_alpha.png_path }})
 
 *Şekil {{ fig_alpha.number }}. {{ fig_alpha.title }}.*{% endif %}
 
 **Beta çeşitlilik.** {{ beta_narrative }}
 
-{% if fig_pcoa %}![{{ fig_pcoa.title }}]({{ fig_pcoa.png_path }})
+{% if fig_pcoa %}![]({{ fig_pcoa.png_path }})
 
 *Şekil {{ fig_pcoa.number }}. {{ fig_pcoa.title }}.*{% endif %}
 
@@ -57,7 +77,7 @@ Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
 
 {% if table_diff %}{{ table_diff }}{% endif %}
 
-{% if fig_volcano %}![{{ fig_volcano.title }}]({{ fig_volcano.png_path }})
+{% if fig_volcano %}![]({{ fig_volcano.png_path }})
 
 *Şekil {{ fig_volcano.number }}. {{ fig_volcano.title }}.*{% endif %}
 
@@ -67,7 +87,7 @@ Tüm downstream istatistik bu bölümdeki ham okuma metriklerinden türetilir.
 
 {{ table_mag }}
 
-{% if fig_mag %}![{{ fig_mag.title }}]({{ fig_mag.png_path }})
+{% if fig_mag %}![]({{ fig_mag.png_path }})
 
 *Şekil {{ fig_mag.number }}. {{ fig_mag.title }}.*{% endif %}
 

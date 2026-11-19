@@ -87,6 +87,9 @@ class ReportContext:
     summary: str = ""
     methods: str = ""
     fig_index: dict[str, int] = field(default_factory=dict)  # rol → şekil no
+    domain_df: Optional[pd.DataFrame] = None          # örnek × grup (% toplam okuma)
+    category_sections: list = field(default_factory=list)  # [{category, df, fig, note}]
+    db_text: str = ""
 
 
 def _fig(manifest: FigureManifest, number: Optional[int]) -> Optional[FigureEntry]:
@@ -115,10 +118,26 @@ def render_markdown(ctx: ReportContext) -> str:
         "groups": ctx.groups,
         "platforms": ctx.platforms,
         "summary": ctx.summary or "Karşılaştırmalı mikrobiyom analizi sonuçları aşağıda özetlenmiştir.",
-        "table_raw_qc": tn.caption("Ham okuma istatistiği (örnek başına)", ctx.qc_df),
+        "table_raw_qc": tn.caption("Ham okuma istatistiği (örnek başına)", _qc_display(ctx.qc_df)),
         "table_qc_delta": tn.caption("Trim öncesi→sonrası tutulma oranı", ctx.qc_delta_df)
             if ctx.qc_delta_df is not None and not ctx.qc_delta_df.empty else "",
-        "table_top_taxa": tn.caption("En bol taksonlar (bağıl bolluk)", _sort_by_mean(ctx.top_taxa), max_rows=15),
+        "table_top_taxa": "" if ctx.category_sections else
+            tn.caption("En bol taksonlar (bağıl bolluk)", _sort_by_mean(ctx.top_taxa), max_rows=15),
+        "db_text": ctx.db_text,
+        "table_domains": tn.caption(
+            "Okumaların biyolojik gruplara dağılımı (toplam okumanın %'si)", _domain_display(ctx.domain_df))
+            if ctx.domain_df is not None and not ctx.domain_df.empty else "",
+        "category_sections": [
+            {
+                "title": sec["category"],
+                "note": sec["note"],
+                "table": tn.caption(f"{sec['category']}: en bol türler (grup içi %)",
+                                    _pct_display(sec["df"]), max_rows=15 if sec["category"] == "Bakteri" else 10)
+                    if sec["df"] is not None and not sec["df"].empty else "",
+                "fig": _fig(ctx.manifest, sec.get("fig")),
+            }
+            for sec in ctx.category_sections
+        ],
         "alpha_narrative": ctx.alpha_test_text,
         "table_alpha": tn.caption("Örnek başına alfa çeşitlilik", ctx.alpha_df),
         "beta_narrative": ctx.beta_test_text,
@@ -147,6 +166,39 @@ _DISPLAY = {
     "metamdbg": "metaMDBG", "semibin2": "SemiBin2", "checkm2": "CheckM2", "ancombc": "ANCOM-BC",
     "nfcore_taxprofiler": "nf-core/taxprofiler", "nfcore_mag": "nf-core/mag",
 }
+
+
+_QC_COLS = {"sample": "Örnek", "n_reads": "Okuma", "total_bases": "Toplam baz",
+            "median_length": "Ortanca uzunluk", "n50": "N50", "mean_quality": "Ort. Q",
+            "gc_percent": "GC %"}
+
+
+def _qc_display(qc: pd.DataFrame) -> pd.DataFrame:
+    """Rapor için kısa, sığan QC tablosu (tam tablo 01_rawdata_qc_stats.tsv'de)."""
+    if qc is None or qc.empty:
+        return qc
+    cols = [c for c in _QC_COLS if c in qc.columns]
+    out = qc[cols].rename(columns=_QC_COLS)
+    for c in ("Okuma", "Toplam baz"):
+        if c in out:
+            out[c] = out[c].map(lambda v: f"{int(v):,}".replace(",", "."))
+    return out
+
+
+def _domain_display(df: pd.DataFrame) -> pd.DataFrame:
+    """Örnek × grup tablosunu grup satırları × örnek sütunlarına çevirir (dar sayfaya sığar)."""
+    t = df.set_index("sample").T
+    t.index.name = "Grup"
+    t = t.map(lambda v: f"{v:.2f}")
+    return t.reset_index()
+
+
+def _pct_display(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.rename(columns={"taxon": "Tür"}).copy()
+    for c in out.columns:
+        if c != "Tür":
+            out[c] = out[c].map(lambda v: f"{v * 100:.2f}")
+    return out
 
 
 def _sort_by_mean(m: pd.DataFrame) -> pd.DataFrame:

@@ -77,3 +77,12 @@ def test_host_removed_from_profile(tmp_path):
     prof_out = pd.read_csv(tmp_path / "out" / "02_taxonomic_profile.tsv", sep="\t")
     assert "Homo sapiens" not in set(prof_out["taxon"])
     assert abs(prof_out["s1"].sum() - 1.0) < 1e-9
+
+
+def test_filter_per_group_keeps_small_groups():
+    m = pd.DataFrame({"taxon": ["B1", "B2", "V1", "V2"],
+                      "s": [0.7, 0.29994, 0.00004, 0.00002]})
+    groups = {"B1": "Bakteri", "B2": "Bakteri", "V1": "Virüs", "V2": "Virüs"}
+    assert len(parsers.filter_low_abundance(m, 1e-4)) == 2
+    out = parsers.filter_low_abundance(m, 1e-4, groups=groups)
+    assert set(out["taxon"]) == {"B1", "B2", "V1", "V2"}

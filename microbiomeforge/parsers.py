@@ -54,16 +54,24 @@ def build_abundance_matrix(per_sample: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return matrix.reset_index()
 
 
-def filter_low_abundance(matrix: pd.DataFrame, min_abundance: float) -> pd.DataFrame:
+def filter_low_abundance(matrix: pd.DataFrame, min_abundance: float,
+                         groups: dict[str, str] | None = None) -> pd.DataFrame:
     """Hiçbir örnekte `min_abundance` bağıl bolluğa ulaşmayan taksonları eler,
     sonra her örneği yeniden 1'e normalize eder.
 
-    Kraken2'nin çok düşük oranlı yanlış-pozitif çağrılarını ayıklamak içindir.
+    `groups` (takson → biyolojik grup) verilirse eşik her grubun KENDİ toplamına göre
+    uygulanır; böylece küçük gruplar (arke, virüs) bakteri baskınlığı yüzünden
+    topluca elenmez. Kraken2'nin çok düşük oranlı yanlış-pozitiflerini ayıklamak içindir.
     """
     if matrix.empty or min_abundance <= 0:
         return matrix
     m = matrix.set_index("taxon")
-    keep = m.max(axis=1) >= min_abundance
+    if groups:
+        g = pd.Series([groups.get(t, "?") for t in m.index], index=m.index)
+        rel = m.groupby(g).transform(lambda col: col / (col.sum() or 1.0))
+        keep = rel.max(axis=1) >= min_abundance
+    else:
+        keep = m.max(axis=1) >= min_abundance
     m = m[keep]
     totals = m.sum(axis=0).replace(0, 1.0)
     m = m / totals

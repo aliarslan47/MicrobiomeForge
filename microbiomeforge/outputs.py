@@ -15,6 +15,7 @@ import pandas as pd
 OUTPUT_FILES: dict[str, str] = {
     "raw_qc": "01_rawdata_qc_stats.tsv",
     "taxonomic_profile": "02_taxonomic_profile.tsv",
+    "taxonomic_groups": "02_taxonomic_groups.tsv",
     "diversity_stats": "03_diversity_stats.tsv",
     "mag_quality": "04_mag_quality.tsv",
     "amr_bgc": "05_amr_bgc_results.tsv",

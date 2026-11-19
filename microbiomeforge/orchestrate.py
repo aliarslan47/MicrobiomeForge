@@ -21,11 +21,36 @@ from typing import Optional
 import pandas as pd
 
 from . import figures as figmod
-from . import parsers, report, stats
+from . import domains, parsers, report, stats
 from .outputs import output_path, write_table
 from .pipelines import DesignKind, Sample, plan_pipelines, resolve_design
 from .qc_stats import compute_raw_stats, qc_delta, qc_table
 from .references import ToolRegistry
+
+
+def _find_k2report(profile: Path, sample: str) -> Optional[Path]:
+    """Bracken profilinin yanındaki Kraken2 raporunu bulur (yerel motor veya nf-core)."""
+    for ext in (".k2report", ".kraken2.report.txt", ".kreport", ".report"):
+        p = profile.parent / f"{sample}{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+def _db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_raw, n_kept) -> str:
+    parts = []
+    if kraken_db:
+        parts.append(f"Kraken2 veritabanı: `{Path(kraken_db).name}`.")
+    for r in classify_rows:
+        parts.append(f"{r['sample']}: okumaların %{r['classified_pct']} kadarı sınıflandırıldı.")
+    if host_fraction and any(v > 0 for v in host_fraction.values()):
+        hf = ", ".join(f"{k} %{v * 100:.3f}" for k, v in host_fraction.items())
+        parts.append(f"Konak (insan) okumaları mikrobiyom profilinden çıkarıldı (Bracken payı: {hf}).")
+    if min_abundance > 0:
+        parts.append(f"Kendi grubu (bakteri, arke, virüs...) içinde hiçbir örnekte "
+                     f"%{min_abundance * 100:g} bağıl bolluğa ulaşmayan türler gürültü olarak "
+                     f"elendi ({n_raw} → {n_kept} tür).")
+    return " ".join(parts)
 
 
 def run_analysis(
@@ -102,9 +127,25 @@ def run_analysis(
     # --- 02: Taksonomik profil ---
     per_sample = {name: parsers.parse_bracken(path, name) for name, path in profile_files.items()}
     matrix = parsers.build_abundance_matrix(per_sample)
+
+    # Biyolojik gruplar (Bakteri/Arke/Virüs/Mantar/...) — Kraken2 raporu varsa.
+    domain_summaries, taxon_cat = [], {}
+    for name, path in profile_files.items():
+        rep_path = _find_k2report(Path(path), name)
+        if rep_path is None:
+            continue
+        ds = domains.parse_k2report(rep_path, name)
+        domain_summaries.append(ds)
+        for t, c in domains.taxon_categories(path, ds).items():
+            taxon_cat.setdefault(t, c)
+    domain_df = domains.summary_table(domain_summaries) if domain_summaries else None
+    if domain_df is not None:
+        write_table(domain_df, outdir, "taxonomic_groups")
+
     host_fraction = {}
     if host_taxa and not matrix.empty:
-        is_host = matrix["taxon"].isin(host_taxa)
+        is_host = matrix["taxon"].isin(host_taxa) | (
+            matrix["taxon"].map(taxon_cat.get) == "Konak (insan)")
         num_cols = [c for c in matrix.columns if c != "taxon"]
         host_fraction = {c: round(float(matrix.loc[is_host, c].sum()), 6) for c in num_cols}
         if is_host.any():
@@ -115,13 +156,18 @@ def run_analysis(
                   f"Bracken payı: {host_fraction}", file=sys.stderr)
     n_taxa_raw = len(matrix)
     if min_abundance > 0:
-        matrix = parsers.filter_low_abundance(matrix, min_abundance)
+        matrix = parsers.filter_low_abundance(matrix, min_abundance, groups=taxon_cat or None)
         print(f"[MicrobiomeForge] Düşük bolluk filtresi (<{min_abundance:g}): "
               f"{n_taxa_raw} → {len(matrix)} takson", file=sys.stderr)
     if not matrix.empty:  # en bol takson üstte
         _num = matrix.select_dtypes("number")
         matrix = matrix.loc[_num.mean(axis=1).sort_values(ascending=False).index].reset_index(drop=True)
-    write_table(matrix, outdir, "taxonomic_profile")
+    if taxon_cat:
+        _out = matrix.copy()
+        _out.insert(1, "group", _out["taxon"].map(lambda t: taxon_cat.get(t, "Bilinmiyor")))
+        write_table(_out, outdir, "taxonomic_profile")
+    else:
+        write_table(matrix, outdir, "taxonomic_profile")
 
     # --- 03: Çeşitlilik (+ tasarım karşılaştırmalıysa grup testleri) ---
     alpha = stats.alpha_diversity(matrix)
@@ -155,7 +201,20 @@ def run_analysis(
     figs = figmod.Figures(workdir / "figs")
     fi = {}
     fi["raw_qc"] = figs.raw_qc(qc_df)
-    fi["abundance"] = figs.abundance_bar(matrix)
+    category_sections = []
+    if taxon_cat:
+        fungi_in_db = domains.db_has_fungi(kraken_db) if kraken_db else None
+        for cat in domains.MICROBIAL:
+            sub = domains.within_category(matrix, taxon_cat, cat)
+            fig_no = None
+            if not sub.empty:
+                fig_no = figs.abundance_bar(sub, title=f"{cat}: en bol türler (grup içi bağıl bolluk)")
+            category_sections.append({
+                "category": cat, "df": sub, "fig": fig_no,
+                "note": domains.category_note(cat, sub, fungi_in_db),
+            })
+    else:
+        fi["abundance"] = figs.abundance_bar(matrix)
     fi["alpha"] = figs.alpha_box(alpha, groups)
     if coords is not None:
         fi["pcoa"] = figs.pcoa_scatter(coords, groups)
@@ -206,6 +265,9 @@ def run_analysis(
             f"olarak analiz edildi. {dspec.note}"
         ),
         fig_index=fi,
+        domain_df=domain_df,
+        category_sections=category_sections,
+        db_text=_db_text(kraken_db, classify_rows, host_fraction, min_abundance, n_taxa_raw, len(matrix)),
     )
     report_out = report.generate(ctx, outdir, workdir)
 
