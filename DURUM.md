@@ -56,7 +56,15 @@ platform (kısa/uzun okuma) otomatik tespiti.
 - Conda ortamı: `microbiomeforge` (environment.yml güncellendi). **56/56 test geçiyor.**
 - Doğrulama: PRJNA827663 (ENA, md5 OK) 6 Illumina (Gün1×3 / Gün30×3) karşılaştırmalı + 2 ONT tekli,
   uçtan uca PDF; ~40 sn/koşu, ~8 GB RAM (8 GB DB).
-- Bilinen kozmetik: Tablo 1 sütun başlıkları üst üste biniyor; şekillerde "Figure N:" + "Şekil N." çift başlık.
+- **Biyolojik gruplar** (`domains.py`): Bakteri / Arke / Virüs / Mantar / Diğer ökaryot / Konak ayrı
+  raporlanır (Kraken2 rapor ağacından); `02_taxonomic_groups.tsv` + profilde `group` sütunu; rapor her
+  grup için ayrı bölüm/tablo/şekil. Filtre: tüm profilde %0,01 VEYA grup içinde %0,5
+  (`--min-group-abundance`). Toplam okumanın %0,01'inden azı olan gruplar "düşük sinyal" uyarılı,
+  çeşitliliğe katılmaz. Konak (insan) profilden çıkarılır. Tamamlanan örnekte Kraken2 yeniden koşmaz (`.done`).
+- Bracken nadir türleri için okuma sayısı (`new_est_reads`) kullanılır (fraction 5 basamağa yuvarlanıyor).
+- Önerilen DB: **PlusPF-16** (bakteri+arke+virüs+mantar+protozoa), 15 GB RAM'de `--memory-mapping` ile;
+  33 M okuma çifti ≈ 13 dk. Standard DB mantar/protozoa içermez. **64/64 test.**
+- Kozmetik düzeltildi: kısa QC tablosu, tek şekil başlığı.
 
 ## Sırada (Ali seçecek)
 - **nf-core motorunun CANLI uçtan-uca kurulumu** (Nextflow + konteyner): şu ana dek parser/stat/rapor katmanı
